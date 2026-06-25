@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { supabase } from "@/lib/supabase";
 
 const LEAVE_TYPES = {
   annual:  { label:"연가",       icon:"🌿", color:"#05C072", bg:"#E8FBF3", border:"#B7F0D5" },
@@ -27,6 +28,15 @@ const HOLIDAYS = {
 const DAY_LABELS = ["일","월","화","수","목","금","토"];
 const RANK_LABELS = ["이등병","일병","상병","병장"];
 const BASE_DUR = { 이등병:2, 일병:6, 상병:6 };
+
+function getDeviceId() {
+  let id = localStorage.getItem("hugom_device_id");
+  if (!id) {
+    id = "dev_" + Math.random().toString(36).slice(2, 18);
+    localStorage.setItem("hugom_device_id", id);
+  }
+  return id;
+}
 
 function calcRankSchedule(enlist, missedMonths) {
   const ed = new Date(enlist);
@@ -116,6 +126,7 @@ function WarnModal({ msg, onClose }) {
     </div>
   );
 }
+
 export default function App() {
   const [tab,setTab]=useState("cal");
   const [leaves,setLeaves]=useState([]);
@@ -126,9 +137,69 @@ export default function App() {
   const [profile,setProfile]=useState(null);
   const [viewingFriendId,setViewingFriendId]=useState(null);
   const [warnMsg,setWarnMsg]=useState("");
+  const [loading,setLoading]=useState(true);
   const unread=notifs.filter(n=>!n.read).length;
   const perfDates=useMemo(()=>profile?calcPerfDates(profile.perf_first_start,profile.perf_cycle_weeks,profile.perf_cycle_days):[],[profile]);
   const markAllRead=()=>setNotifs(ns=>ns.map(n=>({...n,read:true})));
+
+  // 앱 시작 시 저장된 유저 불러오기
+  useEffect(()=>{
+    const loadProfile = async () => {
+      try {
+        const deviceId = getDeviceId();
+        const { data, error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("kakao_id", deviceId)
+          .single();
+        if (data && !error) {
+          setProfile({
+            id: data.id,
+            name: data.name,
+            enlist: data.enlist_date,
+            discharge: data.discharge_date,
+            userType: data.role === "soldier" ? "soldier" : "gomshin",
+            perf_first_start: data.perf_first_start || null,
+            perf_cycle_weeks: data.perf_cycle_weeks || null,
+            perf_cycle_days: data.perf_cycle_days || null,
+            annual_limits: data.annual_limits || {이등병:null,일병:null,상병:null,병장:null},
+            reward_limit: data.reward_limit || 6,
+            missedMonths: data.missed_months || {},
+            visitOutCycle: data.visit_out_cycle || null,
+            invite_code: data.partner_code,
+          });
+        }
+      } catch(e) {
+        console.error("프로필 로드 실패", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadProfile();
+  }, []);
+
+  // 프로필 로드 후 leaves/schedules/notifications 불러오기
+  useEffect(()=>{
+    if (!profile?.id) return;
+    const loadData = async () => {
+      const [lv, sc, nt] = await Promise.all([
+        supabase.from("leaves").select("*").eq("user_id", profile.id).order("start_date"),
+        supabase.from("schedules").select("*").eq("user_id", profile.id).order("date"),
+        supabase.from("notifications").select("*").eq("user_id", profile.id).order("created_at", { ascending: false }),
+      ]);
+      if (lv.data) setLeaves(lv.data.map(l => ({
+        id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo,
+      })));
+      if (sc.data) setSchedules(sc.data.map(s => ({
+        id: s.id, event_type: s.type, event_date: s.date, memo: s.memo,
+      })));
+      if (nt.data) setNotifs(nt.data.map(n => ({
+        id: n.id, type: n.message?.type || "info", text: n.message?.text || n.message,
+        dateRange: n.message?.dateRange || null, time: "이전", read: n.is_read,
+      })));
+    };
+    loadData();
+  }, [profile?.id]);
 
   const checkLimits=(newLeaves,existingLeaves)=>{
     if(!profile||profile.userType==="gomshin") return null;
@@ -154,19 +225,105 @@ export default function App() {
     return warnings.length>0?warnings.join("\n\n"):null;
   };
 
-  const addLeave=(ls)=>{
-    const arr=Array.isArray(ls)?ls:[ls];
-    const warn=checkLimits(arr,leaves);
-    if(warn) setWarnMsg(warn);
-    setLeaves(prev=>[...prev,...arr.map(l=>({...l,id:"l"+Date.now()+Math.random()}))]);
+  const addLeave = async (ls) => {
+    const arr = Array.isArray(ls) ? ls : [ls];
+    const warn = checkLimits(arr, leaves);
+    if (warn) setWarnMsg(warn);
+    const rows = arr.map(l => ({
+      user_id: profile.id,
+      type: l.leave_type,
+      start_date: l.start_date,
+      end_date: l.end_date,
+      days: diffDays(l.start_date, l.end_date) + 1,
+      memo: l.memo || null,
+    }));
+    const { data, error } = await supabase.from("leaves").insert(rows).select();
+    if (!error && data) {
+      setLeaves(prev => [...prev, ...data.map(l => ({
+        id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo,
+      }))]);
+    }
   };
-  const delLeave=(id)=>setLeaves(prev=>prev.filter(l=>l.id!==id));
-  const addSched=(s)=>setSchedules(prev=>[...prev,{...s,id:"s"+Date.now()}]);
-  const delSched=(id)=>setSchedules(prev=>prev.filter(s=>s.id!==id));
-  const addNotif=(notif)=>setNotifs(prev=>[{...notif,id:"n"+Date.now(),time:"방금",read:false},...prev]);
-  const handleReset=()=>{setProfile(null);setLeaves([]);setSchedules([]);setNotifs([]);setFriends([]);setViewingFriendId(null);};
 
-  if(!profile) return <Onboarding onComplete={setProfile}/>;
+  const delLeave = async (id) => {
+    await supabase.from("leaves").delete().eq("id", id);
+    setLeaves(prev => prev.filter(l => l.id !== id));
+  };
+
+  const addSched = async (s) => {
+    const { data, error } = await supabase.from("schedules").insert({
+      user_id: profile.id,
+      type: s.event_type,
+      date: s.event_date,
+      title: s.event_type,
+      memo: s.memo || null,
+    }).select().single();
+    if (!error && data) {
+      setSchedules(prev => [...prev, { id: data.id, event_type: data.type, event_date: data.date, memo: data.memo }]);
+    }
+  };
+
+  const delSched = async (id) => {
+    await supabase.from("schedules").delete().eq("id", id);
+    setSchedules(prev => prev.filter(s => s.id !== id));
+  };
+
+  const addNotif = async (notif) => {
+    const { data, error } = await supabase.from("notifications").insert({
+      user_id: profile.id,
+      message: { type: notif.type, text: notif.text, dateRange: notif.dateRange || null },
+      is_read: false,
+    }).select().single();
+    if (!error && data) {
+      setNotifs(prev => [{
+        id: data.id, type: notif.type, text: notif.text,
+        dateRange: notif.dateRange || null, time: "방금", read: false,
+      }, ...prev]);
+    }
+  };
+
+  const handleReset = async () => {
+    if (profile?.id) {
+      await Promise.all([
+        supabase.from("leaves").delete().eq("user_id", profile.id),
+        supabase.from("schedules").delete().eq("user_id", profile.id),
+        supabase.from("notifications").delete().eq("user_id", profile.id),
+        supabase.from("users").delete().eq("id", profile.id),
+      ]);
+      localStorage.removeItem("hugom_device_id");
+    }
+    setProfile(null); setLeaves([]); setSchedules([]); setNotifs([]); setFriends([]); setViewingFriendId(null);
+  };
+
+  if (loading) return (
+    <div style={{...S.wrap, alignItems:"center", justifyContent:"center"}}>
+      <div style={{fontSize:48}}>🐻</div>
+      <div style={{fontSize:16,fontWeight:700,color:"#8B95A1",marginTop:12}}>불러오는 중...</div>
+    </div>
+  );
+
+  if(!profile) return <Onboarding onComplete={async (profileData) => {
+    const deviceId = getDeviceId();
+    const { data, error } = await supabase.from("users").insert({
+      kakao_id: deviceId,
+      role: profileData.userType,
+      name: profileData.name,
+      enlist_date: profileData.enlist,
+      discharge_date: profileData.discharge,
+      partner_code: profileData.invite_code,
+      perf_first_start: profileData.perf_first_start,
+      perf_cycle_weeks: profileData.perf_cycle_weeks,
+      perf_cycle_days: profileData.perf_cycle_days,
+      annual_limits: profileData.annual_limits,
+      reward_limit: profileData.reward_limit,
+      missed_months: profileData.missedMonths,
+      visit_out_cycle: profileData.visitOutCycle,
+    }).select().single();
+    if (!error && data) {
+      setProfile({ ...profileData, id: data.id });
+    }
+  }}/>;
+
   const linkedSoldier=profile.userType==="gomshin"?friends.find(f=>f.relation==="my_soldier"&&f.status==="accepted"):null;
   const viewingFriend=viewingFriendId?friends.find(f=>f.id===viewingFriendId):null;
   const calLeaves=viewingFriend?(viewingFriend.leaves||[]):linkedSoldier?(linkedSoldier.leaves||[]):leaves;
@@ -178,6 +335,7 @@ export default function App() {
   const tabs=isGomshin
     ?[{id:"cal",icon:"📅",label:"달력"},{id:"friends",icon:"💝",label:"연결"},{id:"profile",icon:"⚙️",label:"내 정보"}]
     :[{id:"cal",icon:"📅",label:"달력"},{id:"leave",icon:"🏖️",label:"휴가"},{id:"friends",icon:"👥",label:"친구"},{id:"profile",icon:"⚙️",label:"내 정보"}];
+
   return (
     <div style={S.wrap}>
       <style>{`*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}button:active{transform:scale(0.95)!important;transition:transform 0.08s;}::-webkit-scrollbar{display:none;}@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}.su{animation:slideUp .25s cubic-bezier(.34,1.2,.64,1);}.fi{animation:fadeIn .18s ease;}.shake{animation:shake .4s ease;}`}</style>
@@ -200,7 +358,21 @@ export default function App() {
         {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} perfDates={calPerfDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} linkedSoldier={linkedSoldier} onAddNotif={addNotif} viewerName={profile.name}/>}
         {tab==="leave"&&!isGomshin&&<LeaveTab profile={profile} leaves={leaves} perfDates={perfDates} onAddLeave={addLeave} onDelLeave={delLeave}/>}
         {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setViewingFriendId(id);setTab("cal");}} onAddNotif={addNotif}/>}
-        {tab==="profile"&&<ProfileTab profile={profile} setProfile={setProfile} leaves={leaves} onReset={handleReset}/>}
+        {tab==="profile"&&<ProfileTab profile={profile} setProfile={async (updater) => {
+          const next = typeof updater === "function" ? updater(profile) : updater;
+          setProfile(next);
+          if (next.id) {
+            await supabase.from("users").update({
+              perf_first_start: next.perf_first_start,
+              perf_cycle_weeks: next.perf_cycle_weeks,
+              perf_cycle_days: next.perf_cycle_days,
+              annual_limits: next.annual_limits,
+              reward_limit: next.reward_limit,
+              missed_months: next.missedMonths,
+              visit_out_cycle: next.visitOutCycle,
+            }).eq("id", next.id);
+          }
+        }} leaves={leaves} onReset={handleReset}/>}
       </div>
       <nav style={S.tabBar}>
         {tabs.map(t=>(<button key={t.id} onClick={()=>{setTab(t.id);setViewingFriendId(null);}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,background:"transparent",border:"none",cursor:"pointer"}}><div style={{width:44,height:28,borderRadius:10,background:tab===t.id&&!viewingFriendId?(isGomshin?"#FFF0F8":"#EBF3FF"):"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"background .18s"}}><span style={{fontSize:19,filter:tab===t.id&&!viewingFriendId?"none":"grayscale(1) opacity(.4)"}}>{t.icon}</span></div><span style={{fontSize:10,fontWeight:tab===t.id&&!viewingFriendId?700:500,color:tab===t.id&&!viewingFriendId?(isGomshin?"#E91E8C":"#3182F6"):"#B0B8C1",transition:"color .18s"}}>{t.label}</span></button>))}
@@ -217,6 +389,9 @@ export default function App() {
     </div>
   );
 }
+
+// ===================== 이하 컴포넌트는 원본과 동일 =====================
+
 function Onboarding({onComplete}){
   const [userType,setUserType]=useState(null);
   const [name,setName]=useState("");
@@ -336,6 +511,7 @@ function Onboarding({onComplete}){
     </div>
   );
 }
+
 function Field({label,sub,children}){return(<div><div style={{fontSize:13,fontWeight:600,color:"#333D4B",marginBottom:6}}>{label}{sub&&<span style={{fontSize:11,color:"#B0B8C1",marginLeft:6,fontWeight:400}}>{sub}</span>}</div>{children}</div>);}
 function CalendarTab({profile,leaves,schedules,perfDates,onAddLeave,onDelLeave,onAddSched,onDelSched,readOnly,isGomshin,linkedSoldier,onAddNotif,viewerName}){
   const today=new Date();
@@ -642,7 +818,17 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
   const [subTab,setSubTab]=useState("list");const [code,setCode]=useState("");const [relType,setRelType]=useState("friend");const [found,setFound]=useState(null);const [toast,setToast]=useState("");const [showGomshinSuggest,setShowGomshinSuggest]=useState(false);
   const today=toKey(new Date());const isGomshin=profile.userType==="gomshin";const accepted=friends.filter(f=>f.status==="accepted");const pending=friends.filter(f=>f.status==="pending");const myBf=accepted.find(f=>f.relation==="my_soldier");
   const showToast=(msg)=>{setToast(msg);setTimeout(()=>setToast(""),2800);};
-  const searchCode=()=>{if(code.length<4){showToast("코드를 입력해주세요");return;}if(isGomshin){setFound({id:"demo_soldier",name:"이민준",userType:"soldier",discharge:"2027-06-15",enlist:"2026-01-05",perf_first_start:"2026-03-10",perf_cycle_weeks:8,perf_cycle_days:4,leaves:[],schedules:[]});}else{setFound({id:"demo_friend",name:"박지현",userType:"soldier",discharge:"2027-04-20",enlist:"2026-02-01",leaves:[],schedules:[]});}};
+  const searchCode=async()=>{
+    if(code.length<4){showToast("코드를 입력해주세요");return;}
+    const { data, error } = await supabase.from("users").select("*").eq("partner_code", code.toUpperCase()).single();
+    if (error || !data) { showToast("해당 코드를 찾을 수 없어요"); return; }
+    setFound({
+      id: data.id, name: data.name, userType: data.role,
+      discharge: data.discharge_date, enlist: data.enlist_date,
+      perf_first_start: data.perf_first_start, perf_cycle_weeks: data.perf_cycle_weeks,
+      perf_cycle_days: data.perf_cycle_days, leaves: [], schedules: [],
+    });
+  };
   const sendRequest=()=>{if(!found)return;const rel=isGomshin?"my_soldier":relType;setFriends(prev=>[...prev,{...found,id:"f"+Date.now(),relation:rel,status:"accepted"}]);const msg=isGomshin?`${found.name}님의 군화와 연결됐어요!`:`${found.name}님과 연결됐어요!`;setNotifs(prev=>[{id:"n"+Date.now(),type:"connection_accepted",text:msg,time:"방금",read:false},...prev]);showToast(msg);setSubTab("list");setCode("");setFound(null);};
   const handleGomshinSend=(type,dateRange)=>{if(!myBf||!onAddNotif)return;const labels={leave_suggest:"🌿 휴가 제안",visit_request:"🏠 영내면회 제안",visit_out_suggest:"🚗 면회외출 제안"};onAddNotif({type,text:`${profile.name}(곰신)님이 ${labels[type]}을 보냈어요 💝`,dateRange});showToast(`${labels[type]}을 보냈어요!`);setShowGomshinSuggest(false);};
   const sendNoti=(toName,type)=>{const texts={visit_request:`${profile.name}님이 면회를 요청했어요`,match_request:`${profile.name}님이 휴가 맞추기를 요청했어요`};setNotifs(prev=>[{id:"n"+Date.now(),type,text:texts[type],time:"방금",read:false},...prev]);showToast(`${toName}님에게 알림을 보냈어요`);};
@@ -678,7 +864,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
           <div style={{background:isGomshin?"linear-gradient(135deg,#FF4081,#E91E8C)":"#EBF3FF",borderRadius:20,padding:18,border:isGomshin?"none":"1px solid #A5C9FF"}}>
             <div style={{fontSize:12,color:isGomshin?"rgba(255,255,255,.8)":"#3182F6",fontWeight:700,marginBottom:8}}>내 초대 코드</div>
             <div style={{fontSize:34,fontWeight:900,color:isGomshin?"#fff":"#3182F6",letterSpacing:6,textAlign:"center",marginBottom:10}}>{profile.invite_code}</div>
-            <button onClick={()=>showToast("코드가 복사됐어요!")} style={{...S.btn,background:isGomshin?"rgba(255,255,255,.2)":"#3182F6",color:"#fff",boxShadow:"none",border:isGomshin?"1px solid rgba(255,255,255,.3)":"none"}}>코드 복사</button>
+            <button onClick={()=>{ navigator.clipboard?.writeText(profile.invite_code); showToast("코드가 복사됐어요!"); }} style={{...S.btn,background:isGomshin?"rgba(255,255,255,.2)":"#3182F6",color:"#fff",boxShadow:"none",border:isGomshin?"1px solid rgba(255,255,255,.3)":"none"}}>코드 복사</button>
           </div>
           <div>
             <div style={{fontSize:13,fontWeight:600,color:"#333D4B",marginBottom:6}}>{isGomshin?"군화 코드 입력":"친구 코드 입력"}</div>
@@ -783,7 +969,7 @@ function ProfileTab({profile,setProfile,leaves,onReset}){
       <DdayShareCard profile={profile} rankInfo={rankInfo}/>
 
       <button onClick={()=>{if(window.confirm("처음부터 다시 설정할까요?\n(등록된 휴가도 모두 삭제됩니다)"))onReset();}} style={{padding:14,borderRadius:14,border:"1.5px solid #FFD0D0",background:"#FFF0F1",fontSize:14,fontWeight:700,color:"#F04452",cursor:"pointer"}}>처음부터 다시 설정</button>
-      <div style={{textAlign:"center",fontSize:11,color:"#D1D6DB"}}>휴곰 v1.1 · {isGomshin?"곰신 모드":"공군 전용"}</div>
+      <div style={{textAlign:"center",fontSize:11,color:"#D1D6DB"}}>휴곰 v1.2 · {isGomshin?"곰신 모드":"공군 전용"}</div>
 
       {showRankEdit&&(
         <div className="fi" style={S.overlay} onClick={()=>setShowRankEdit(false)}>
@@ -997,7 +1183,6 @@ function SalaryCalc({rankInfo,profile}){
               <div style={{background:"rgba(255,255,255,.12)",borderRadius:8,padding:"7px 10px",flex:1}}><div style={{fontSize:9,color:"rgba(255,255,255,.5)",marginBottom:2}}>일급 환산</div><div style={{fontSize:14,fontWeight:700,color:"#fff"}}>{Math.round(base/30).toLocaleString()}원</div></div>
             </div>
           </div>
-
           {totalSalaryCalc&&(
             <div style={{background:"#F9FAFB",borderRadius:14,padding:"14px 16px",marginBottom:12,border:"1px solid #E8ECF0"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:showTotal?12:0}}>
@@ -1013,7 +1198,6 @@ function SalaryCalc({rankInfo,profile}){
               </>)}
             </div>
           )}
-
           <div style={{background:"#FFF8EE",borderRadius:14,padding:"14px 16px",border:"1.5px solid #DDB690"}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
               <div style={{fontSize:13,fontWeight:700,color:"#8B5E1A"}}>🏦 장병내일준비적금</div>
