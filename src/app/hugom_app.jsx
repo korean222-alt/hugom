@@ -34,6 +34,7 @@ async function signInWithKakao() {
     provider: 'kakao',
     options: {
       redirectTo: window.location.origin,
+      scopes: 'profile_nickname profile_image',
     },
   });
   if (error) console.error('카카오 로그인 오류:', error);
