@@ -1034,7 +1034,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
                       {f.userType==="soldier"?`D-${Math.max(0,diffDays(today,f.discharge))}일 전역까지`:"연결된 친구"}
                     </div>
                   </div>
-                  <div style={{display:"flex",gap:6"}}>
+                  <div style={{display:"flex",gap:6}}>
                     {f.userType==="soldier"&&(
                       <button onClick={()=>onViewFriendCal(f.id)} style={{padding:"8px 12px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>📅 달력</button>
                     )}
