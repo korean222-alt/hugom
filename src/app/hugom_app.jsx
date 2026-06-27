@@ -128,6 +128,105 @@ function WarnModal({ msg, onClose }) {
   );
 }
 
+// ===================== 랜딩 페이지 (로그인 전) =====================
+function LandingPage() {
+  const features = [
+    { icon:"📅", title:"군인·곰신 함께 보는 휴가 달력", desc:"연가·포상·위로휴가·성과제 외박까지 한눈에. 서로의 일정을 실시간으로 공유해요." },
+    { icon:"🪖", title:"계급·호봉 자동 계산", desc:"입대일만 입력하면 현재 계급, 호봉, 진급일까지 자동으로 계산해줘요." },
+    { icon:"🌿", title:"휴가 한도 관리", desc:"연가·포상휴가·위로휴가·성과제 외박을 등록하고 잔여 한도를 관리해요." },
+    { icon:"💌", title:"곰신의 날짜 선택 제안", desc:"곰신이 원하는 날짜를 선택해서 휴가·영내면회·면회외출을 직접 제안할 수 있어요." },
+    { icon:"💰", title:"월급·장병내일준비적금 계산기", desc:"계급별 월급과 전역 시 예상 적금 수령액을 바로 계산해요." },
+    { icon:"📤", title:"전역 D-day 카드 공유", desc:"예쁜 전역 카운트다운 카드를 만들어 카카오톡·인스타그램에 공유해요." },
+  ];
+
+  return (
+    <div style={{...S.wrap, overflowY:"auto"}}>
+      <style>{`*{box-sizing:border-box;margin:0;padding:0;}button:active{transform:scale(0.97)!important;}::-webkit-scrollbar{display:none;}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}.su{animation:slideUp .35s cubic-bezier(.34,1.2,.64,1);}.fi{animation:fadeIn .4s ease;}`}</style>
+
+      {/* 히어로 섹션 */}
+      <div style={{background:"linear-gradient(160deg,#1E3A0F 0%,#2D4A1E 40%,#3D6B2A 80%,#556B2F 100%)",padding:"52px 24px 40px",position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",top:-60,right:-40,width:220,height:220,borderRadius:"50%",background:"rgba(255,255,255,.05)"}}/>
+        <div style={{position:"absolute",bottom:-80,left:-30,width:160,height:160,borderRadius:"50%",background:"rgba(0,0,0,.12)"}}/>
+        <div className="fi" style={{position:"relative"}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+            <div style={{fontSize:52}}>🐻</div>
+            <div>
+              <div style={{fontSize:36,fontWeight:900,color:"#fff",lineHeight:1}}>휴곰</div>
+              <div style={{fontSize:13,color:"rgba(255,255,255,.6)",marginTop:2}}>군인과 곰신의 휴가 관리</div>
+            </div>
+          </div>
+          <div style={{fontSize:18,fontWeight:700,color:"rgba(255,255,255,.95)",lineHeight:1.5,marginBottom:8}}>
+            입대일 입력 하나로<br/>
+            <span style={{color:"#A8D5A2"}}>모든 휴가 관리를 자동으로</span>
+          </div>
+          <div style={{fontSize:13,color:"rgba(255,255,255,.6)",lineHeight:1.6}}>
+            군인과 곰신이 함께 쓰는 스마트한 휴가 캘린더
+          </div>
+        </div>
+      </div>
+
+      {/* 핵심 기능 소개 */}
+      <div style={{padding:"28px 20px 0"}}>
+        <div style={{fontSize:12,fontWeight:700,color:"#8B95A1",letterSpacing:"0.08em",marginBottom:16}}>주요 기능</div>
+        <div className="su" style={{display:"flex",flexDirection:"column",gap:12}}>
+          {features.map((f, i) => (
+            <div key={i} style={{display:"flex",gap:14,padding:"14px 16px",background:"#F9FAFB",borderRadius:16,border:"1px solid #F0F2F5",alignItems:"flex-start"}}>
+              <div style={{width:44,height:44,borderRadius:13,background:"linear-gradient(135deg,#2D4A1E,#556B2F)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
+                {f.icon}
+              </div>
+              <div>
+                <div style={{fontSize:14,fontWeight:700,color:"#191F28",marginBottom:3}}>{f.title}</div>
+                <div style={{fontSize:12,color:"#6B7685",lineHeight:1.6}}>{f.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 사용 방법 */}
+      <div style={{padding:"28px 20px 0"}}>
+        <div style={{fontSize:12,fontWeight:700,color:"#8B95A1",letterSpacing:"0.08em",marginBottom:14}}>이용 방법</div>
+        <div style={{display:"flex",flexDirection:"column",gap:0,background:"#F9FAFB",borderRadius:16,overflow:"hidden",border:"1px solid #F0F2F5"}}>
+          {[
+            {num:"01", text:"카카오로 1초 로그인"},
+            {num:"02", text:"군화 또는 곰신 선택"},
+            {num:"03", text:"입대일·전역일 입력"},
+            {num:"04", text:"친구 코드로 서로 연결"},
+          ].map((step, i, arr) => (
+            <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"13px 16px",borderBottom:i<arr.length-1?"1px solid #EEF0F3":"none"}}>
+              <div style={{width:28,height:28,borderRadius:9,background:"linear-gradient(135deg,#2D4A1E,#556B2F)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <span style={{fontSize:11,fontWeight:800,color:"#fff"}}>{step.num}</span>
+              </div>
+              <span style={{fontSize:14,fontWeight:500,color:"#333D4B"}}>{step.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* CTA 버튼 */}
+      <div style={{padding:"28px 20px 52px"}}>
+        <button
+          onClick={signInWithKakao}
+          style={{
+            width:"100%", padding:"17px",
+            borderRadius:16, background:"#FEE500",
+            color:"#191919", fontSize:17, fontWeight:800,
+            border:"none", cursor:"pointer",
+            boxShadow:"0 4px 20px rgba(254,229,0,.4)",
+            display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#191919"><path d="M12 3C6.48 3 2 6.92 2 11.76c0 3.06 1.87 5.75 4.71 7.3l-1.2 4.47 4.98-3.3A11.5 11.5 0 0012 20.52c5.52 0 10-3.92 10-8.76C22 6.92 17.52 3 12 3z"/></svg>
+          카카오로 시작하기
+        </button>
+        <div style={{textAlign:"center",fontSize:11,color:"#C0C8D4",marginTop:14,lineHeight:1.6}}>
+          로그인 시 서비스 이용약관 및 개인정보처리방침에 동의하게 됩니다
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [tab,setTab]=useState("cal");
   const [leaves,setLeaves]=useState([]);
@@ -138,23 +237,30 @@ export default function App() {
   const [profile,setProfile]=useState(null);
   const [viewingFriendId,setViewingFriendId]=useState(null);
   const [warnMsg,setWarnMsg]=useState("");
-  const [loading,setLoading]=useState(true);
+  // authState: "loading" | "no_user" | "need_onboarding" | "ready"
+  const [authState,setAuthState]=useState("loading");
   const unread=notifs.filter(n=>!n.read).length;
   const perfDates=useMemo(()=>profile?calcPerfDates(profile.perf_first_start,profile.perf_cycle_weeks,profile.perf_cycle_days):[],[profile]);
   const markAllRead=()=>setNotifs(ns=>ns.map(n=>({...n,read:true})));
 
-  // 앱 시작 시 저장된 유저 불러오기
+  // 앱 시작 시 인증 상태 + 프로필 확인
   useEffect(()=>{
-    const loadProfile = async () => {
+    const checkAuth = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-if (!user) { setLoading(false); return; }
-const { data, error } = await supabase
-  .from("users")
-  .select("*")
-  .eq("kakao_id", user.id)
-  .single();
+        if (!user) {
+          setAuthState("no_user");
+          return;
+        }
+        // 유저 있음 → DB에서 프로필 조회
+        const { data, error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("kakao_id", user.id)
+          .single();
+
         if (data && !error) {
+          // 기존 유저 → 바로 앱 진입
           setProfile({
             id: data.id,
             name: data.name,
@@ -170,14 +276,25 @@ const { data, error } = await supabase
             visitOutCycle: data.visit_out_cycle || null,
             invite_code: data.partner_code,
           });
+          setAuthState("ready");
+        } else {
+          // 신규 유저 → 온보딩 필요
+          setAuthState("need_onboarding");
         }
       } catch(e) {
-        console.error("프로필 로드 실패", e);
-      } finally {
-        setLoading(false);
+        console.error("인증 확인 실패", e);
+        setAuthState("no_user");
       }
     };
-    loadProfile();
+    checkAuth();
+
+    // Supabase auth 상태 변화 감지 (카카오 로그인 후 리다이렉트 시)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        checkAuth();
+      }
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   // 프로필 로드 후 leaves/schedules/notifications 불러오기
@@ -292,40 +409,54 @@ const { data, error } = await supabase
         supabase.from("notifications").delete().eq("user_id", profile.id),
         supabase.from("users").delete().eq("id", profile.id),
       ]);
-      localStorage.removeItem("hugom_device_id");
     }
-    setProfile(null); setLeaves([]); setSchedules([]); setNotifs([]); setFriends([]); setViewingFriendId(null);
+    setProfile(null);
+    setLeaves([]);
+    setSchedules([]);
+    setNotifs([]);
+    setFriends([]);
+    setViewingFriendId(null);
+    setAuthState("need_onboarding");
   };
 
-  if (loading) return (
+  // ── 렌더 분기 ──
+  if (authState === "loading") return (
     <div style={{...S.wrap, alignItems:"center", justifyContent:"center"}}>
       <div style={{fontSize:48}}>🐻</div>
       <div style={{fontSize:16,fontWeight:700,color:"#8B95A1",marginTop:12}}>불러오는 중...</div>
     </div>
   );
 
-  if(!profile) return <Onboarding onComplete={async (profileData) => {
-const { data: { user } } = await supabase.auth.getUser();
-const { data, error } = await supabase.from("users").insert({
-  kakao_id: user.id,
-      role: profileData.userType,
-      name: profileData.name,
-      enlist_date: profileData.enlist,
-      discharge_date: profileData.discharge,
-      partner_code: profileData.invite_code,
-      perf_first_start: profileData.perf_first_start,
-      perf_cycle_weeks: profileData.perf_cycle_weeks,
-      perf_cycle_days: profileData.perf_cycle_days,
-      annual_limits: profileData.annual_limits,
-      reward_limit: profileData.reward_limit,
-      missed_months: profileData.missedMonths,
-      visit_out_cycle: profileData.visitOutCycle,
-    }).select().single();
-    if (!error && data) {
-      setProfile({ ...profileData, id: data.id });
-    }
-  }}/>;
+  // 로그인 안 된 상태 → 랜딩 페이지
+  if (authState === "no_user") return <LandingPage />;
 
+  // 로그인 됐지만 프로필 없음 → 온보딩 (군화/곰신 선택)
+  if (authState === "need_onboarding") return (
+    <Onboarding onComplete={async (profileData) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data, error } = await supabase.from("users").insert({
+        kakao_id: user.id,
+        role: profileData.userType,
+        name: profileData.name,
+        enlist_date: profileData.enlist,
+        discharge_date: profileData.discharge,
+        partner_code: profileData.invite_code,
+        perf_first_start: profileData.perf_first_start,
+        perf_cycle_weeks: profileData.perf_cycle_weeks,
+        perf_cycle_days: profileData.perf_cycle_days,
+        annual_limits: profileData.annual_limits,
+        reward_limit: profileData.reward_limit,
+        missed_months: profileData.missedMonths,
+        visit_out_cycle: profileData.visitOutCycle,
+      }).select().single();
+      if (!error && data) {
+        setProfile({ ...profileData, id: data.id });
+        setAuthState("ready");
+      }
+    }}/>
+  );
+
+  // 로그인 + 프로필 있음 → 메인 앱
   const linkedSoldier=profile.userType==="gomshin"?friends.find(f=>f.relation==="my_soldier"&&f.status==="accepted"):null;
   const viewingFriend=viewingFriendId?friends.find(f=>f.id===viewingFriendId):null;
   const calLeaves=viewingFriend?(viewingFriend.leaves||[]):linkedSoldier?(linkedSoldier.leaves||[]):leaves;
@@ -392,8 +523,7 @@ const { data, error } = await supabase.from("users").insert({
   );
 }
 
-// ===================== 이하 컴포넌트는 원본과 동일 =====================
-
+// ===================== 온보딩 (신규 유저만) =====================
 function Onboarding({onComplete}){
   const [userType,setUserType]=useState(null);
   const [name,setName]=useState("");
@@ -431,25 +561,11 @@ function Onboarding({onComplete}){
         <div style={{position:"absolute",top:-30,right:-20,width:180,height:180,borderRadius:"50%",background:"rgba(255,255,255,.06)"}}/>
         <div className="fi" style={{position:"relative"}}>
           <div style={{fontSize:54,marginBottom:6}}>🐻</div>
-          <div style={{fontSize:32,fontWeight:900,color:"#fff",marginBottom:6}}>휴곰</div>
-          <div style={{fontSize:15,color:"rgba(255,255,255,.75)",lineHeight:1.6,marginBottom:20}}>군인과 곰신의 휴가를 연결해주는<br/>휴가 관리 서비스</div>
-          {[{icon:"📅",text:"친구·곰신의 휴가 일정을 함께 볼 수 있어요"},{icon:"🪖",text:"입대일로 계급·호봉 자동 계산, 진급일 알림"},{icon:"💌",text:"곰신이 날짜 선택해서 휴가·면회 제안 가능"}].map((f,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,background:"rgba(255,255,255,.12)",borderRadius:12,padding:"10px 14px"}}>
-              <span style={{fontSize:20}}>{f.icon}</span><span style={{fontSize:13,color:"#fff",fontWeight:500,lineHeight:1.4}}>{f.text}</span>
-            </div>
-          ))}
+          <div style={{fontSize:28,fontWeight:900,color:"#fff",marginBottom:4}}>반가워요!</div>
+          <div style={{fontSize:15,color:"rgba(255,255,255,.75)",lineHeight:1.6}}>나는 어떤 유형인가요?</div>
         </div>
       </div>
       <div style={{padding:"24px 20px 48px"}}>
-        <button onClick={signInWithKakao} style={{
-  width:"100%", padding:16, borderRadius:14,
-  background:"#FEE500", color:"#191919",
-  fontSize:16, fontWeight:700, border:"none", cursor:"pointer",
-  marginBottom:16
-}}>
-  카카오로 시작하기
-</button>
-        <div style={{fontSize:15,fontWeight:700,color:"#191F28",marginBottom:16,textAlign:"center"}}>나는 어떤 유형인가요?</div>
         <div className="su" style={{display:"flex",flexDirection:"column",gap:14}}>
           <button onClick={()=>setUserType("soldier")} style={{padding:"22px 20px",borderRadius:20,border:"2px solid #8FA47A",background:"#F2E7D5",cursor:"pointer",textAlign:"left",display:"flex",gap:16,alignItems:"flex-start"}}>
             <div style={{width:48,height:48,borderRadius:14,background:"#556B2F",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,flexShrink:0}}>🐻</div>
@@ -824,10 +940,20 @@ function LeaveCard({leave,onDelete,past}){
   return(<div style={{background:past?"#F9FAFB":lt.bg,borderRadius:16,padding:"14px 16px",border:`1px solid ${past?"#E8ECF0":lt.border}`,marginBottom:8,display:"flex",alignItems:"center",gap:12}}><div style={{width:42,height:42,borderRadius:12,background:past?"#E8ECF0":lt.color+"22",border:`1.5px solid ${past?"#D1D6DB":lt.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{lt.icon}</div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:past?"#8B95A1":lt.color}}>{lt.label}</div><div style={{fontSize:12,color:"#4E5968",marginTop:2}}>{leave.start_date} ~ {leave.end_date}</div><div style={{fontSize:11,color:"#B0B8C1"}}>{days}일{leave.memo?" · "+leave.memo:""}</div></div><button onClick={onDelete} style={{padding:"6px 10px",background:"rgba(240,68,82,.08)",border:"none",borderRadius:8,fontSize:12,color:"#F04452",fontWeight:700,cursor:"pointer"}}>삭제</button></div>);
 }
 
+// ===================== 친구 탭 (데모 로직 삭제, 실제 DB 연동만 유지) =====================
 function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal,onAddNotif}){
-  const [subTab,setSubTab]=useState("list");const [code,setCode]=useState("");const [relType,setRelType]=useState("friend");const [found,setFound]=useState(null);const [toast,setToast]=useState("");const [showGomshinSuggest,setShowGomshinSuggest]=useState(false);
-  const today=toKey(new Date());const isGomshin=profile.userType==="gomshin";const accepted=friends.filter(f=>f.status==="accepted");const pending=friends.filter(f=>f.status==="pending");const myBf=accepted.find(f=>f.relation==="my_soldier");
+  const [subTab,setSubTab]=useState("list");
+  const [code,setCode]=useState("");
+  const [found,setFound]=useState(null);
+  const [toast,setToast]=useState("");
+  const [showGomshinSuggest,setShowGomshinSuggest]=useState(false);
+  const today=toKey(new Date());
+  const isGomshin=profile.userType==="gomshin";
+  const accepted=friends.filter(f=>f.status==="accepted");
+  const myBf=accepted.find(f=>f.relation==="my_soldier");
   const showToast=(msg)=>{setToast(msg);setTimeout(()=>setToast(""),2800);};
+
+  // 실제 DB 조회
   const searchCode=async()=>{
     if(code.length<4){showToast("코드를 입력해주세요");return;}
     const { data, error } = await supabase.from("users").select("*").eq("partner_code", code.toUpperCase()).single();
@@ -839,9 +965,25 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
       perf_cycle_days: data.perf_cycle_days, leaves: [], schedules: [],
     });
   };
-  const sendRequest=()=>{if(!found)return;const rel=isGomshin?"my_soldier":relType;setFriends(prev=>[...prev,{...found,id:"f"+Date.now(),relation:rel,status:"accepted"}]);const msg=isGomshin?`${found.name}님의 군화와 연결됐어요!`:`${found.name}님과 연결됐어요!`;setNotifs(prev=>[{id:"n"+Date.now(),type:"connection_accepted",text:msg,time:"방금",read:false},...prev]);showToast(msg);setSubTab("list");setCode("");setFound(null);};
-  const handleGomshinSend=(type,dateRange)=>{if(!myBf||!onAddNotif)return;const labels={leave_suggest:"🌿 휴가 제안",visit_request:"🏠 영내면회 제안",visit_out_suggest:"🚗 면회외출 제안"};onAddNotif({type,text:`${profile.name}(곰신)님이 ${labels[type]}을 보냈어요 💝`,dateRange});showToast(`${labels[type]}을 보냈어요!`);setShowGomshinSuggest(false);};
-  const sendNoti=(toName,type)=>{const texts={visit_request:`${profile.name}님이 면회를 요청했어요`,match_request:`${profile.name}님이 휴가 맞추기를 요청했어요`};setNotifs(prev=>[{id:"n"+Date.now(),type,text:texts[type],time:"방금",read:false},...prev]);showToast(`${toName}님에게 알림을 보냈어요`);};
+
+  // 연결 요청 (DB 저장 없이 로컬 상태만 — 실제 구현은 Phase 4)
+  const sendRequest=()=>{
+    if(!found)return;
+    const rel=isGomshin?"my_soldier":"friend";
+    setFriends(prev=>[...prev,{...found,id:"f"+Date.now(),relation:rel,status:"accepted"}]);
+    const msg=isGomshin?`${found.name}님의 군화와 연결됐어요!`:`${found.name}님과 연결됐어요!`;
+    showToast(msg);
+    setSubTab("list");setCode("");setFound(null);
+  };
+
+  const handleGomshinSend=(type,dateRange)=>{
+    if(!myBf||!onAddNotif)return;
+    const labels={leave_suggest:"🌿 휴가 제안",visit_request:"🏠 영내면회 제안",visit_out_suggest:"🚗 면회외출 제안"};
+    onAddNotif({type,text:`${profile.name}(곰신)님이 ${labels[type]}을 보냈어요 💝`,dateRange});
+    showToast(`${labels[type]}을 보냈어요!`);
+    setShowGomshinSuggest(false);
+  };
+
   const accent=isGomshin?"#E91E8C":"#3182F6";
   return(
     <div style={{display:"flex",flexDirection:"column"}}>
@@ -849,52 +991,117 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
       <div style={{display:"flex",gap:0,padding:"12px 16px",borderBottom:"1px solid #F2F4F6"}}>
         {["list","add"].map(t=>(<button key={t} onClick={()=>setSubTab(t)} style={{flex:1,padding:9,borderRadius:12,border:"none",fontSize:14,fontWeight:700,cursor:"pointer",background:subTab===t?accent:"#F2F4F6",color:subTab===t?"#fff":"#8B95A1"}}>{t==="list"?`${isGomshin?"연결":"친구"} 목록 (${accepted.length})`:(isGomshin?"+ 군화 연결":"+ 친구 추가")}</button>))}
       </div>
+
       {subTab==="list"&&(
         <div style={{padding:16,display:"flex",flexDirection:"column",gap:10}}>
+          {/* 곰신: 연결된 군화 카드 */}
           {isGomshin&&myBf&&(<>
             <div style={{background:"linear-gradient(135deg,#FF4081,#E91E8C)",borderRadius:20,padding:"16px 18px"}}>
               <div style={{fontSize:11,color:"rgba(255,255,255,.7)",fontWeight:600,marginBottom:8}}>연결된 군화</div>
-              <div style={{display:"flex",alignItems:"center",gap:12}}><div style={{width:44,height:44,borderRadius:14,background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🪖</div><div style={{flex:1}}><div style={{fontSize:17,fontWeight:800,color:"#fff"}}>{myBf.name}</div><div style={{fontSize:12,color:"rgba(255,255,255,.7)",marginTop:2}}>D-{Math.max(0,diffDays(today,myBf.discharge))}일 전역까지</div></div><button onClick={()=>onViewFriendCal(myBf.id)} style={{padding:"8px 12px",background:"rgba(255,255,255,.9)",color:"#E91E8C",borderRadius:12,border:"none",fontSize:12,fontWeight:800,cursor:"pointer"}}>📅 달력</button></div>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:44,height:44,borderRadius:14,background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🪖</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:17,fontWeight:800,color:"#fff"}}>{myBf.name}</div>
+                  <div style={{fontSize:12,color:"rgba(255,255,255,.7)",marginTop:2}}>D-{Math.max(0,diffDays(today,myBf.discharge))}일 전역까지</div>
+                </div>
+                <button onClick={()=>onViewFriendCal(myBf.id)} style={{padding:"8px 12px",background:"rgba(255,255,255,.9)",color:"#E91E8C",borderRadius:12,border:"none",fontSize:12,fontWeight:800,cursor:"pointer"}}>📅 달력</button>
+              </div>
             </div>
             <div style={{background:"#FFF0F8",borderRadius:16,padding:"14px 16px",border:"1px solid #F8BBD0"}}>
               <div style={{fontSize:12,fontWeight:700,color:"#C2185B",marginBottom:10}}>💝 날짜 선택해서 제안하기</div>
               <button onClick={()=>setShowGomshinSuggest(true)} style={{...S.btn,background:"linear-gradient(135deg,#FF4081,#E91E8C)",color:"#fff",boxShadow:"0 4px 14px rgba(233,30,140,.3)"}}>💌 날짜 선택해서 제안 보내기</button>
             </div>
           </>)}
-          {isGomshin&&!myBf&&(<div style={{textAlign:"center",padding:"40px 0",color:"#B0B8C1"}}><div style={{fontSize:40,marginBottom:12}}>💝</div><div style={{fontSize:14,fontWeight:600,color:"#E91E8C"}}>군화를 아직 연결하지 않았어요</div></div>)}
+          {isGomshin&&!myBf&&(
+            <div style={{textAlign:"center",padding:"40px 0",color:"#B0B8C1"}}>
+              <div style={{fontSize:40,marginBottom:12}}>💝</div>
+              <div style={{fontSize:14,fontWeight:600,color:"#E91E8C"}}>군화를 아직 연결하지 않았어요</div>
+              <div style={{fontSize:12,color:"#B0B8C1",marginTop:6}}>친구 추가 탭에서 군화 코드를 입력해요</div>
+            </div>
+          )}
+
+          {/* 군화: 친구 목록 */}
           {!isGomshin&&<>
-            {pending.length>0&&<>{pending.map(f=>(<div key={f.id} style={{...S.card,display:"flex",alignItems:"center",gap:12}}><div style={{width:40,height:40,borderRadius:12,background:"#EBF3FF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>👤</div><div style={{flex:1}}><div style={{fontSize:14,fontWeight:700}}>{f.name}</div></div><div style={{display:"flex",gap:6}}><button onClick={()=>{setFriends(prev=>prev.map(fr=>fr.id===f.id?{...fr,status:"accepted"}:fr));showToast(`${f.name}님과 연결됐어요!`);}} style={{padding:"7px 12px",background:"#3182F6",color:"#fff",borderRadius:8,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>수락</button><button onClick={()=>setFriends(prev=>prev.filter(fr=>fr.id!==f.id))} style={{padding:"7px 10px",background:"#F2F4F6",color:"#8B95A1",borderRadius:8,border:"none",fontSize:12,fontWeight:600,cursor:"pointer"}}>거절</button></div></div>))}</>}
-            {accepted.map(f=>(<FriendCard key={f.id} f={f} today={today} onSendNoti={sendNoti} onRemove={()=>setFriends(prev=>prev.filter(fr=>fr.id!==f.id))} onViewCal={f.userType==="soldier"?()=>onViewFriendCal(f.id):null}/>))}
-            {accepted.length===0&&pending.length===0&&(<div style={{textAlign:"center",padding:"60px 0",color:"#B0B8C1"}}><div style={{fontSize:40,marginBottom:12}}>👥</div><div style={{fontSize:14,fontWeight:600}}>연결된 친구가 없어요</div></div>)}
+            {accepted.length>0
+              ? accepted.map(f=>(
+                <div key={f.id} style={{...S.card,display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{width:44,height:44,borderRadius:14,background:"#F2F4F6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>
+                    {f.userType==="soldier"?"🪖":"💝"}
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:15,fontWeight:700,color:"#191F28"}}>{f.name}</div>
+                    <div style={{fontSize:12,color:"#8B95A1",marginTop:2}}>
+                      {f.userType==="soldier"?`D-${Math.max(0,diffDays(today,f.discharge))}일 전역까지`:"연결된 친구"}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:6"}}>
+                    {f.userType==="soldier"&&(
+                      <button onClick={()=>onViewFriendCal(f.id)} style={{padding:"8px 12px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>📅 달력</button>
+                    )}
+                    <button onClick={()=>setFriends(prev=>prev.filter(fr=>fr.id!==f.id))} style={{padding:"8px 10px",background:"#FFF0F1",color:"#F04452",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>삭제</button>
+                  </div>
+                </div>
+              ))
+              : (
+                <div style={{textAlign:"center",padding:"60px 0",color:"#B0B8C1"}}>
+                  <div style={{fontSize:40,marginBottom:12}}>👥</div>
+                  <div style={{fontSize:14,fontWeight:600}}>연결된 친구가 없어요</div>
+                  <div style={{fontSize:12,marginTop:6}}>친구 추가 탭에서 코드로 연결해요</div>
+                </div>
+              )
+            }
           </>}
+
+          {/* 준비 중 안내 */}
+          <div style={{padding:"12px 14px",background:"#F9FAFB",borderRadius:12,border:"1px solid #E8ECF0",display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:16}}>🔧</span>
+            <div style={{fontSize:12,color:"#8B95A1",lineHeight:1.6}}>
+              <span style={{fontWeight:700,color:"#4E5968"}}>알림·면회 요청 기능</span>은 곧 업데이트될 예정이에요
+            </div>
+          </div>
         </div>
       )}
+
       {subTab==="add"&&(
         <div style={{padding:16,display:"flex",flexDirection:"column",gap:16}}>
+          {/* 내 초대 코드 */}
           <div style={{background:isGomshin?"linear-gradient(135deg,#FF4081,#E91E8C)":"#EBF3FF",borderRadius:20,padding:18,border:isGomshin?"none":"1px solid #A5C9FF"}}>
             <div style={{fontSize:12,color:isGomshin?"rgba(255,255,255,.8)":"#3182F6",fontWeight:700,marginBottom:8}}>내 초대 코드</div>
             <div style={{fontSize:34,fontWeight:900,color:isGomshin?"#fff":"#3182F6",letterSpacing:6,textAlign:"center",marginBottom:10}}>{profile.invite_code}</div>
             <button onClick={()=>{ navigator.clipboard?.writeText(profile.invite_code); showToast("코드가 복사됐어요!"); }} style={{...S.btn,background:isGomshin?"rgba(255,255,255,.2)":"#3182F6",color:"#fff",boxShadow:"none",border:isGomshin?"1px solid rgba(255,255,255,.3)":"none"}}>코드 복사</button>
           </div>
+
+          {/* 코드 검색 */}
           <div>
             <div style={{fontSize:13,fontWeight:600,color:"#333D4B",marginBottom:6}}>{isGomshin?"군화 코드 입력":"친구 코드 입력"}</div>
-            <div style={{display:"flex",gap:8}}><input style={{...S.input,flex:1,textAlign:"center",fontSize:20,fontWeight:800,letterSpacing:4}} value={code} onChange={e=>setCode(e.target.value.toUpperCase().slice(0,6))} placeholder="AB12CD"/><button onClick={searchCode} style={{padding:"0 16px",background:accent,color:"#fff",borderRadius:12,border:"none",fontSize:14,fontWeight:700,cursor:"pointer"}}>검색</button></div>
+            <div style={{display:"flex",gap:8}}>
+              <input style={{...S.input,flex:1,textAlign:"center",fontSize:20,fontWeight:800,letterSpacing:4}} value={code} onChange={e=>setCode(e.target.value.toUpperCase().slice(0,6))} placeholder="AB12CD"/>
+              <button onClick={searchCode} style={{padding:"0 16px",background:accent,color:"#fff",borderRadius:12,border:"none",fontSize:14,fontWeight:700,cursor:"pointer"}}>검색</button>
+            </div>
           </div>
-          {found&&(<div style={S.card}>
-            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}><div style={{width:44,height:44,borderRadius:14,background:"#F2F4F6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🪖</div><div><div style={{fontSize:16,fontWeight:800}}>{found.name}</div><div style={{fontSize:12,color:"#8B95A1",marginTop:2}}>D-{Math.max(0,diffDays(today,found.discharge))}일 남음</div></div></div>
-            {!isGomshin&&(<><div style={{display:"flex",gap:8,marginBottom:14}}>{[{k:"friend",l:"👥 친구"},{k:"gomshin",l:"🐻 곰신"}].map(r=>(<button key={r.k} onClick={()=>setRelType(r.k)} style={{...S.chip,flex:1,borderColor:relType===r.k?"#3182F6":"#E8ECF0",background:relType===r.k?"#EBF3FF":"#fff",color:relType===r.k?"#3182F6":"#4E5968"}}>{r.l}</button>))}</div></>)}
-            <button style={{...S.btn,background:accent,color:"#fff",boxShadow:`0 4px 14px ${isGomshin?"rgba(233,30,140,.28)":"rgba(49,130,246,.28)"}`}} onClick={sendRequest}>{found.name}님{isGomshin?"의 군화와":"에게"} 연결 요청</button>
-          </div>)}
+
+          {found&&(
+            <div style={S.card}>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+                <div style={{width:44,height:44,borderRadius:14,background:"#F2F4F6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🪖</div>
+                <div>
+                  <div style={{fontSize:16,fontWeight:800}}>{found.name}</div>
+                  <div style={{fontSize:12,color:"#8B95A1",marginTop:2}}>D-{Math.max(0,diffDays(today,found.discharge))}일 남음</div>
+                </div>
+              </div>
+              <button style={{...S.btn,background:accent,color:"#fff",boxShadow:`0 4px 14px ${isGomshin?"rgba(233,30,140,.28)":"rgba(49,130,246,.28)"}`}} onClick={sendRequest}>
+                {found.name}님{isGomshin?"의 군화와":"에게"} 연결 요청
+              </button>
+            </div>
+          )}
         </div>
       )}
+
       {showGomshinSuggest&&myBf&&<GomshinSuggestPanel soldierName={myBf.name} onSend={handleGomshinSend} onClose={()=>setShowGomshinSuggest(false)}/>}
     </div>
   );
 }
-function FriendCard({f,today,onSendNoti,onRemove,onViewCal}){
-  const [open,setOpen]=useState(false);const left=Math.max(0,diffDays(today,f.discharge));const isSoldier=f.userType==="soldier";
-  return(<div style={{...S.card,marginBottom:0}}><div style={{display:"flex",alignItems:"center",gap:12,cursor:"pointer"}} onClick={()=>setOpen(o=>!o)}><div style={{width:44,height:44,borderRadius:14,background:"#F2F4F6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{isSoldier?"🪖":"💝"}</div><div style={{flex:1}}><div style={{fontSize:15,fontWeight:700}}>{f.name}</div><div style={{fontSize:12,color:"#8B95A1",marginTop:2}}>{isSoldier?`D-${left}일 전역까지`:"연결된 친구"}</div></div><div style={{fontSize:14,color:"#D1D6DB",transform:open?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</div></div>{open&&(<div style={{marginTop:14,paddingTop:14,borderTop:"1px solid #F2F4F6",display:"flex",gap:8,flexWrap:"wrap"}}>{isSoldier&&onViewCal&&<button onClick={onViewCal} style={{padding:"8px 14px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>📅 달력 보기</button>}{isSoldier&&<button onClick={()=>onSendNoti(f.name,"visit_request")} style={{padding:"8px 14px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>🏠 면회 요청</button>}{isSoldier&&<button onClick={()=>onSendNoti(f.name,"match_request")} style={{padding:"8px 14px",background:"#E8FBF3",color:"#05C072",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>📅 휴가 맞추기</button>}<button onClick={onRemove} style={{padding:"8px 14px",background:"#FFF0F1",color:"#F04452",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>연결 삭제</button></div>)}</div>);
-}
+
 function ProfileTab({profile,setProfile,leaves,onReset}){
   const today=toKey(new Date());
   const left=Math.max(0,diffDays(today,profile.discharge));
@@ -979,7 +1186,7 @@ function ProfileTab({profile,setProfile,leaves,onReset}){
       <DdayShareCard profile={profile} rankInfo={rankInfo}/>
 
       <button onClick={()=>{if(window.confirm("처음부터 다시 설정할까요?\n(등록된 휴가도 모두 삭제됩니다)"))onReset();}} style={{padding:14,borderRadius:14,border:"1.5px solid #FFD0D0",background:"#FFF0F1",fontSize:14,fontWeight:700,color:"#F04452",cursor:"pointer"}}>처음부터 다시 설정</button>
-      <div style={{textAlign:"center",fontSize:11,color:"#D1D6DB"}}>휴곰 v1.2 · {isGomshin?"곰신 모드":"공군 전용"}</div>
+      <div style={{textAlign:"center",fontSize:11,color:"#D1D6DB"}}>휴곰 v1.3 · {isGomshin?"곰신 모드":"공군 전용"}</div>
 
       {showRankEdit&&(
         <div className="fi" style={S.overlay} onClick={()=>setShowRankEdit(false)}>
