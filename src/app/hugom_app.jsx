@@ -29,13 +29,14 @@ const DAY_LABELS = ["일","월","화","수","목","금","토"];
 const RANK_LABELS = ["이등병","일병","상병","병장"];
 const BASE_DUR = { 이등병:2, 일병:6, 상병:6 };
 
-function getDeviceId() {
-  let id = localStorage.getItem("hugom_device_id");
-  if (!id) {
-    id = "dev_" + Math.random().toString(36).slice(2, 18);
-    localStorage.setItem("hugom_device_id", id);
-  }
-  return id;
+async function signInWithKakao() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'kakao',
+    options: {
+      redirectTo: window.location.origin,
+    },
+  });
+  if (error) console.error('카카오 로그인 오류:', error);
 }
 
 function calcRankSchedule(enlist, missedMonths) {
@@ -146,12 +147,13 @@ export default function App() {
   useEffect(()=>{
     const loadProfile = async () => {
       try {
-        const deviceId = getDeviceId();
-        const { data, error } = await supabase
-          .from("users")
-          .select("*")
-          .eq("kakao_id", deviceId)
-          .single();
+        const { data: { user } } = await supabase.auth.getUser();
+if (!user) { setLoading(false); return; }
+const { data, error } = await supabase
+  .from("users")
+  .select("*")
+  .eq("kakao_id", user.id)
+  .single();
         if (data && !error) {
           setProfile({
             id: data.id,
@@ -303,9 +305,9 @@ export default function App() {
   );
 
   if(!profile) return <Onboarding onComplete={async (profileData) => {
-    const deviceId = getDeviceId();
-    const { data, error } = await supabase.from("users").insert({
-      kakao_id: deviceId,
+const { data: { user } } = await supabase.auth.getUser();
+const { data, error } = await supabase.from("users").insert({
+  kakao_id: user.id,
       role: profileData.userType,
       name: profileData.name,
       enlist_date: profileData.enlist,
@@ -439,6 +441,14 @@ function Onboarding({onComplete}){
         </div>
       </div>
       <div style={{padding:"24px 20px 48px"}}>
+        <button onClick={signInWithKakao} style={{
+  width:"100%", padding:16, borderRadius:14,
+  background:"#FEE500", color:"#191919",
+  fontSize:16, fontWeight:700, border:"none", cursor:"pointer",
+  marginBottom:16
+}}>
+  카카오로 시작하기
+</button>
         <div style={{fontSize:15,fontWeight:700,color:"#191F28",marginBottom:16,textAlign:"center"}}>나는 어떤 유형인가요?</div>
         <div className="su" style={{display:"flex",flexDirection:"column",gap:14}}>
           <button onClick={()=>setUserType("soldier")} style={{padding:"22px 20px",borderRadius:20,border:"2px solid #8FA47A",background:"#F2E7D5",cursor:"pointer",textAlign:"left",display:"flex",gap:16,alignItems:"flex-start"}}>
