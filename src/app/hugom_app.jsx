@@ -254,7 +254,6 @@ export default function App() {
           setAuthState("no_user");
           return;
         }
-        // 유저 있음 → DB에서 프로필 조회
         const { data, error } = await supabase
           .from("users")
           .select("*")
@@ -262,7 +261,6 @@ export default function App() {
           .single();
 
         if (data && !error) {
-          // 기존 유저 → 바로 앱 진입
           setProfile({
             id: data.id,
             name: data.name,
@@ -280,7 +278,6 @@ export default function App() {
           });
           setAuthState("ready");
         } else {
-          // 신규 유저 → 온보딩 필요
           setAuthState("need_onboarding");
         }
       } catch(e) {
@@ -288,14 +285,16 @@ export default function App() {
         setAuthState("no_user");
       }
     };
-    checkAuth();
 
-    // Supabase auth 상태 변화 감지 (카카오 로그인 후 리다이렉트 시)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
         checkAuth();
+      } else if (event === "SIGNED_OUT") {
+        setAuthState("no_user");
+        setProfile(null);
       }
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
