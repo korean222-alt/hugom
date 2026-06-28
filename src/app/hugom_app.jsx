@@ -229,7 +229,7 @@ export default function App() {
   // authState: "loading" | "no_user" | "need_onboarding" | "ready"
   const [authState,setAuthState]=useState("loading");
   const unread=notifs.filter(n=>!n.read).length;
-  const outingDates=useMemo(()=>profile?calcOutingDates(profile.perf_first_start,profile.perf_cycle_weeks,profile.perf_cycle_days):[],[profile]);
+  const perfDates=useMemo(()=>profile?calcOutingDates(profile.perf_first_start,profile.perf_cycle_weeks,profile.perf_cycle_days):[],[profile]);
   const markAllRead=()=>setNotifs(ns=>ns.map(n=>({...n,read:true})));
 
   // 앱 시작 시 인증 상태 + 프로필 확인
@@ -554,8 +554,8 @@ export default function App() {
       </header>
       {warnMsg&&<WarnModal msg={warnMsg} onClose={()=>setWarnMsg("")}/>}
       <div style={S.content}>
-        {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} outingDates={calOutingDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} linkedSoldier={linkedSoldier} onAddNotif={addNotif} myName={profile.name}/>}
-        {tab==="leave"&&!isGomshin&&<LeaveTab profile={profile} leaves={leaves} outingDates={perfDates} onAddLeave={addLeave} onDelLeave={delLeave}/>}
+        {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} perfDates={calOutingDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} linkedSoldier={linkedSoldier} onAddNotif={addNotif} myName={profile.name}/>}
+        {tab==="leave"&&!isGomshin&&<LeaveTab profile={profile} leaves={leaves} perfDates={perfDates} onAddLeave={addLeave} onDelLeave={delLeave}/>}
         {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setViewingFriendId(id);setTab("cal");}} onAddNotif={addNotif} onDisconnect={disconnectPartner}/>}
         {tab==="profile"&&<ProfileTab profile={profile} setAuthState={setAuthState} setProfile={async (updater) => {
           const next = typeof updater === "function" ? updater(profile) : updater;
