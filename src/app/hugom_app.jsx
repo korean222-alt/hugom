@@ -1440,19 +1440,19 @@ function ServiceTimeline({profile,rankInfo,leaves}){
 }
 function SalaryCalc({rankInfo, profile}){
   const [open, setOpen] = useState(false);
-  const [durations, setDurations] = useState({ 이등병: 2, 일병: 6, 상병: 6, 병장: 4 }); // 기본값
+  const [durations, setDurations] = useState({ 이등병: 2, 일병: 6, 상병: 6, 병장: 4 });
   
   const totalSalary = useMemo(() => {
     let total = 0;
     RANK_LABELS.forEach(r => {
-      total += SOLDIER_PAY[r] * (durations[r] || 0);
+      total += (SOLDIER_PAY[r] || 0) * (durations[r] || 0);
     });
     return total;
   }, [durations]);
 
   const totalSavings = useMemo(() => {
     const months = Object.values(durations).reduce((a, b) => a + b, 0);
-    return (totalSalary + (NAEILJUN_MAX * months)) * 1.05; // 대략적인 이자 포함
+    return (totalSalary + (NAEILJUN_MAX * months)) * 1.05;
   }, [totalSalary, durations]);
 
   if (!open) return (
@@ -1494,107 +1494,6 @@ function SalaryCalc({rankInfo, profile}){
         </div>
         <button style={{...S.btn,background:"#3182F6",color:"#fff"}} onClick={()=>setOpen(false)}>확인</button>
       </div>
-    </div>
-  );
-}만원`;
-
-  const totalSalaryCalc=useMemo(()=>{
-    if(!profile||!rankInfo) return null;
-    const discharge=new Date(profile.discharge);
-    const {promotions}=calcRankSchedule(profile.enlist,profile.missedMonths||{});
-    const enlistDate=new Date(profile.enlist);
-    const ranges=[
-      {rank:"이등병",start:new Date(enlistDate.getFullYear(),enlistDate.getMonth()+1,1),end:new Date(promotions["이등병"])},
-      {rank:"일병",start:new Date(promotions["이등병"]),end:new Date(promotions["일병"])},
-      {rank:"상병",start:new Date(promotions["일병"]),end:new Date(promotions["상병"])},
-      {rank:"병장",start:new Date(promotions["상병"]),end:discharge},
-    ];
-    let total=0;const breakdown=[];
-    ranges.forEach(({rank,start,end})=>{
-      if(end<=start)return;
-      const months=Math.max(0,(end.getFullYear()-start.getFullYear())*12+(end.getMonth()-start.getMonth()));
-      const pay=SOLDIER_PAY[rank]*months;
-      total+=pay;breakdown.push({rank,months,pay,monthly:SOLDIER_PAY[rank]});
-    });
-    return {total,breakdown};
-  },[profile,rankInfo]);
-
-  const totalMonths=profile?Math.max(1,Math.round(diffDays(profile.enlist,profile.discharge)/30)):18;
-  const capAmt=Math.min(savingAmt,NAEILJUN_MAX);
-  const monthlyRate=0.05/12;
-  const myTotal=capAmt*totalMonths;
-  const matchTotal=capAmt*totalMonths;
-  const myInterest=capAmt*((Math.pow(1+monthlyRate,totalMonths)-1)/monthlyRate)-myTotal;
-  const grandTotal=myTotal+matchTotal+Math.round(myInterest);
-
-  return(
-    <div style={S.card}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:open?14:0}}>
-        <div><div style={{fontSize:14,fontWeight:700}}>💰 월급 · 적금 계산기</div>{!open&&<div style={{fontSize:12,color:"#8B95A1",marginTop:2}}>{selRank} · 월 {fmtWon(base)}</div>}</div>
-        <button onClick={()=>setOpen(o=>!o)} style={{fontSize:12,color:"#556B2F",fontWeight:700,background:"#F2E7D5",border:"none",borderRadius:8,padding:"5px 10px",cursor:"pointer"}}>{open?"접기":"계산하기"}</button>
-      </div>
-      {open&&(
-        <div>
-          <div style={{display:"flex",gap:6,marginBottom:14}}>
-            {RANK_LABELS.map(r=>(<button key={r} onClick={()=>setSelRank(r)} style={{flex:1,padding:"8px 4px",borderRadius:10,border:`1.5px solid ${selRank===r?"#556B2F":"#E8ECF0"}`,background:selRank===r?"#556B2F":"#F9FAFB",fontSize:12,fontWeight:700,color:selRank===r?"#fff":"#8B95A1",cursor:"pointer"}}>{r}</button>))}
-          </div>
-          <div style={{background:"linear-gradient(135deg,#3D5A1E,#556B2F)",borderRadius:16,padding:"18px 20px",marginBottom:12,position:"relative",overflow:"hidden"}}>
-            <div style={{position:"absolute",right:-10,top:-10,fontSize:56,opacity:.15}}>🐻</div>
-            <div style={{fontSize:11,color:"rgba(255,255,255,.6)",marginBottom:4}}>2025년 월 실수령액</div>
-            <div style={{fontSize:38,fontWeight:900,color:"#fff",lineHeight:1}}>{fmtWon(base)}</div>
-            <div style={{fontSize:11,color:"rgba(255,255,255,.5)",marginTop:6}}>소득세·4대보험 없음 — 기본급 = 실수령</div>
-            <div style={{display:"flex",gap:12,marginTop:12}}>
-              <div style={{background:"rgba(255,255,255,.12)",borderRadius:8,padding:"7px 10px",flex:1}}><div style={{fontSize:9,color:"rgba(255,255,255,.5)",marginBottom:2}}>연간 수령</div><div style={{fontSize:14,fontWeight:700,color:"#fff"}}>{fmtMan(base*12)}</div></div>
-              <div style={{background:"rgba(255,255,255,.12)",borderRadius:8,padding:"7px 10px",flex:1}}><div style={{fontSize:9,color:"rgba(255,255,255,.5)",marginBottom:2}}>일급 환산</div><div style={{fontSize:14,fontWeight:700,color:"#fff"}}>{Math.round(base/30).toLocaleString()}원</div></div>
-            </div>
-          </div>
-          {totalSalaryCalc&&(
-            <div style={{background:"#F9FAFB",borderRadius:14,padding:"14px 16px",marginBottom:12,border:"1px solid #E8ECF0"}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:showTotal?12:0}}>
-                <div><div style={{fontSize:13,fontWeight:700,color:"#191F28"}}>💵 복무 전체 월급 합산</div>{!showTotal&&<div style={{fontSize:12,color:"#3182F6",fontWeight:800,marginTop:2}}>총 {fmtMan(totalSalaryCalc.total)}</div>}</div>
-                <button onClick={()=>setShowTotal(s=>!s)} style={{fontSize:11,color:"#3182F6",background:"#EBF3FF",border:"none",borderRadius:6,padding:"4px 8px",cursor:"pointer"}}>{showTotal?"접기":"상세보기"}</button>
-              </div>
-              {showTotal&&(<>
-                {totalSalaryCalc.breakdown.filter(b=>b.months>0).map(b=>(<div key={b.rank} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid #F2F4F6",alignItems:"center"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:44,height:22,borderRadius:6,background:b.rank===rankInfo?.currentRank?"#3182F6":"#E8ECF0",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:10,fontWeight:700,color:b.rank===rankInfo?.currentRank?"#fff":"#8B95A1"}}>{b.rank}</span></div><span style={{fontSize:11,color:"#8B95A1"}}>{b.months}개월 × {b.monthly.toLocaleString()}원</span></div>
-                  <span style={{fontSize:12,fontWeight:700,color:"#191F28"}}>{fmtMan(b.pay)}</span>
-                </div>))}
-                <div style={{display:"flex",justifyContent:"space-between",paddingTop:8,marginTop:4,borderTop:"2px solid #3182F6"}}><span style={{fontSize:13,fontWeight:800,color:"#191F28"}}>총 합계</span><span style={{fontSize:14,fontWeight:900,color:"#3182F6"}}>{fmtMan(totalSalaryCalc.total)}</span></div>
-              </>)}
-            </div>
-          )}
-          <div style={{background:"#FFF8EE",borderRadius:14,padding:"14px 16px",border:"1.5px solid #DDB690"}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#8B5E1A"}}>🏦 장병내일준비적금</div>
-              <button onClick={()=>setShowSaving(s=>!s)} style={{fontSize:11,color:"#8B5E1A",background:"rgba(139,94,26,.1)",border:"none",borderRadius:6,padding:"3px 8px",cursor:"pointer"}}>{showSaving?"접기":"계산"}</button>
-            </div>
-            <div style={{display:"flex",gap:7,marginBottom:showSaving?12:0,flexWrap:"wrap"}}>
-              {[{label:"내 납입",value:"월 최대 55만",sub:""},{label:"정부매칭",value:"납입액 100%",sub:"최대 55만"},{label:"군 장려금",value:"연 5%",sub:"복리이자"}].map((b,i)=>(<div key={i} style={{background:"rgba(139,94,26,.1)",borderRadius:8,padding:"6px 10px",flex:1,minWidth:80}}><div style={{fontSize:9,color:"#8B5E1A",marginBottom:2}}>{b.label}</div><div style={{fontSize:12,fontWeight:800,color:"#5A3A0A",lineHeight:1.2}}>{b.value}</div>{b.sub&&<div style={{fontSize:9,color:"#B0946A"}}>{b.sub}</div>}</div>))}
-            </div>
-            {showSaving&&(
-              <div>
-                <div style={{marginBottom:10}}>
-                  <div style={{fontSize:11,color:"#8B5E1A",marginBottom:6,fontWeight:600}}>월 납입액 (최대 55만원)</div>
-                  <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                    {[100000,200000,300000,400000,550000].map(amt=>(<button key={amt} onClick={()=>setSavingAmt(amt)} style={{flex:1,minWidth:52,padding:"7px 2px",borderRadius:8,border:`1.5px solid ${savingAmt===amt?"#8B5E1A":"#DDB690"}`,background:savingAmt===amt?"#8B5E1A":"#FFF8EE",fontSize:11,fontWeight:700,color:savingAmt===amt?"#fff":"#8B5E1A",cursor:"pointer"}}>{amt===550000?"55만(최대)":`${amt/10000}만`}</button>))}
-                  </div>
-                </div>
-                <div style={{marginBottom:12,padding:"10px 12px",background:"rgba(139,94,26,.08)",borderRadius:10}}>
-                  <div style={{fontSize:11,color:"#8B5E1A"}}>복무 기간: 약 {totalMonths}개월 ({profile?.enlist} ~ {profile?.discharge})</div>
-                </div>
-                <div style={{background:"linear-gradient(135deg,#8B5E1A,#A0722A)",borderRadius:12,padding:"14px 16px"}}>
-                  <div style={{fontSize:11,color:"rgba(255,255,255,.65)",marginBottom:6}}>전역 시 예상 총 수령액</div>
-                  <div style={{fontSize:32,fontWeight:900,color:"#FFE082",lineHeight:1}}>{fmtMan(grandTotal)}</div>
-                  <div style={{height:1,background:"rgba(255,255,255,.2)",margin:"10px 0"}}/>
-                  {[{label:"내 납입",val:myTotal,color:"rgba(255,255,255,.9)"},{label:"정부 매칭 (100%)",val:matchTotal,color:"#81C784"},{label:"장려금 이자 (연 5%)",val:Math.round(myInterest),color:"#FFD54F"}].map((row,i)=>(<div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><span style={{fontSize:11,color:"rgba(255,255,255,.65)"}}>{row.label}</span><span style={{fontSize:13,fontWeight:700,color:row.color}}>{fmtMan(row.val)}</span></div>))}
-                </div>
-                <div style={{fontSize:10,color:"#B0946A",marginTop:6,textAlign:"center"}}>※ 이자는 연 5% 월복리 근사값 · 실제 조건에 따라 다를 수 있어요</div>
-              </div>
-            )}
-          </div>
-          <div style={{marginTop:8,fontSize:10,color:"#B0B8C1",textAlign:"center"}}>※ 2025년 국방부 공식 기준 · 수당 별도</div>
-        </div>
-      )}
     </div>
   );
 }
