@@ -463,7 +463,7 @@ export default function App() {
         {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} perfDates={calPerfDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} linkedSoldier={linkedSoldier} onAddNotif={addNotif} viewerName={profile.name}/>}
         {tab==="leave"&&!isGomshin&&<LeaveTab profile={profile} leaves={leaves} perfDates={perfDates} onAddLeave={addLeave} onDelLeave={delLeave}/>}
         {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setViewingFriendId(id);setTab("cal");}} onAddNotif={addNotif}/>}
-        {tab==="profile"&&<ProfileTab profile={profile} setProfile={async (updater) => {
+        {tab==="profile"&&<ProfileTab profile={profile} setAuthState={setAuthState} setProfile={async (updater) => {
           const next = typeof updater === "function" ? updater(profile) : updater;
           setProfile(next);
           if (next.id) {
@@ -1074,7 +1074,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
   );
 }
 
-function ProfileTab({profile,setProfile,leaves,onReset}){
+function ProfileTab({profile,setProfile,leaves,onReset,setAuthState}){
   const today=toKey(new Date());
   const left=Math.max(0,diffDays(today,profile.discharge));
   const total=diffDays(profile.enlist,profile.discharge);
@@ -1177,7 +1177,24 @@ function ProfileTab({profile,setProfile,leaves,onReset}){
         }
       }} style={{padding:14,borderRadius:14,border:"1.5px solid #FFD0D0",background:"#FFF0F1",fontSize:14,fontWeight:700,color:"#F04452",cursor:"pointer"}}>회원탈퇴</button>
 
-      <button onClick={()=>{if(window.confirm("처음부터 다시 설정할까요?\n(등록된 휴가도 모두 삭제됩니다)"))onReset();}} style={{padding:14,borderRadius:14,border:"1.5px solid #E8ECF0",background:"#F9FAFB",fontSize:14,fontWeight:600,color:"#B0B8C1",cursor:"pointer"}}>처음부터 다시 설정</button>
+      <div style={{display:"flex",gap:8,marginTop:4}}>
+  <button onClick={async()=>{
+    await supabase.auth.signOut();
+    setProfile(null);setLeaves([]);setSchedules([]);setNotifs([]);setFriends([]);
+    setAuthState("no_user");
+  }} style={{flex:1,padding:10,borderRadius:12,border:"1.5px solid #E8ECF0",background:"#F9FAFB",fontSize:12,fontWeight:600,color:"#4E5968",cursor:"pointer"}}>
+    로그아웃
+  </button>
+  <button onClick={()=>{if(window.confirm("처음부터 다시 설정할까요?\n(등록된 휴가도 모두 삭제됩니다)"))onReset();}} style={{flex:1,padding:10,borderRadius:12,border:"1.5px solid #E8ECF0",background:"#F9FAFB",fontSize:12,fontWeight:600,color:"#4E5968",cursor:"pointer"}}>
+    초기화
+  </button>
+  <button onClick={()=>{
+    const input=window.prompt("탈퇴하려면 '탈퇴하겠습니다'를 입력하세요");
+    if(input==="탈퇴하겠습니다"){onReset();supabase.auth.signOut();}
+  }} style={{flex:1,padding:10,borderRadius:12,border:"1.5px solid #FFD0D0",background:"#FFF0F1",fontSize:12,fontWeight:600,color:"#F04452",cursor:"pointer"}}>
+    회원탈퇴
+  </button>
+</div>
 
       <div style={{textAlign:"center",fontSize:11,color:"#D1D6DB"}}>휴곰 v1.3 · {isGomshin?"곰신 모드":"공군 전용"}</div>
 
