@@ -34,11 +34,15 @@ async function signInWithKakao() {
     provider: 'kakao',
     options: {
       redirectTo: window.location.origin,
-      scopes: 'profile_nickname profile_image',
+      queryParams: {
+        // 이메일을 제외하고 프로필 정보만 명시적으로 요청
+        scope: 'profile_nickname profile_image',
+      },
     },
   });
   if (error) console.error('카카오 로그인 오류:', error);
 }
+
 function calcRankSchedule(enlist, missedMonths) {
   const ed = new Date(enlist);
   const dur = {};
