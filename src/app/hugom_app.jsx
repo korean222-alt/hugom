@@ -243,6 +243,7 @@ export default function App() {
             missedMonths: data.missed_months || {},
             visitOutCycle: data.visit_out_cycle || null,
             invite_code: data.partner_code,
+            partner_id: data.partner_id || null,
           });
           setAuthState("ready");
         } else {
@@ -266,7 +267,7 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 프로필 로드 후 leaves/schedules/notifications 불러오기
+  // 프로필 로드 후 leaves/schedules/notifications 불러오기 + 파트너 데이터 로드
   useEffect(()=>{
     if (!profile?.id) return;
     const loadData = async () => {
@@ -285,8 +286,65 @@ export default function App() {
         id: n.id, type: n.message?.type || "info", text: n.message?.text || n.message,
         dateRange: n.message?.dateRange || null, time: "이전", read: n.is_read,
       })));
+
+      // 파트너 데이터 로드 (partner_id 있을 때)
+      if (profile.partner_id) {
+        await loadPartnerData(profile.partner_id);
+      }
     };
     loadData();
+  }, [profile?.id]);
+
+  // 파트너 데이터 불러오기 함수
+  const loadPartnerData = async (partnerId) => {
+    const [pu, plv, psc] = await Promise.all([
+      supabase.from("users").select("*").eq("id", partnerId).single(),
+      supabase.from("leaves").select("*").eq("user_id", partnerId).order("start_date"),
+      supabase.from("schedules").select("*").eq("user_id", partnerId).order("date"),
+    ]);
+    if (pu.data) {
+      const pd = pu.data;
+      const partnerObj = {
+        id: pd.id,
+        name: pd.name,
+        userType: pd.role === "soldier" ? "soldier" : "gomshin",
+        enlist: pd.enlist_date,
+        discharge: pd.discharge_date,
+        perf_first_start: pd.perf_first_start,
+        perf_cycle_weeks: pd.perf_cycle_weeks,
+        perf_cycle_days: pd.perf_cycle_days,
+        relation: pd.role === "soldier" ? "my_soldier" : "my_gomshin",
+        status: "accepted",
+        leaves: plv.data ? plv.data.map(l => ({ id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo })) : [],
+        schedules: psc.data ? psc.data.map(s => ({ id: s.id, event_type: s.type, event_date: s.date, memo: s.memo })) : [],
+      };
+      setFriends([partnerObj]);
+    }
+  };
+
+  // Realtime: 파트너가 보낸 알림 실시간 수신 (PHASE 4)
+  useEffect(()=>{
+    if (!profile?.id) return;
+    const channel = supabase
+      .channel("partner-notifs-" + profile.id)
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "notifications",
+        filter: `user_id=eq.${profile.id}`,
+      }, (payload) => {
+        const n = payload.new;
+        setNotifs(prev => [{
+          id: n.id,
+          type: n.message?.type || "info",
+          text: n.message?.text || n.message,
+          dateRange: n.message?.dateRange || null,
+          time: "방금",
+          read: false,
+        }, ...prev]);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [profile?.id]);
 
   const checkLimits=(newLeaves,existingLeaves)=>{
@@ -369,6 +427,16 @@ export default function App() {
       }, ...prev]);
     }
   };
+
+  // 파트너 연결 해제 (PHASE 4)
+  const disconnectPartner = useCallback(async () => {
+    if (!profile?.id) return;
+    const partner = friends[0];
+    await supabase.from("users").update({ partner_id: null }).eq("id", profile.id);
+    if (partner?.id) await supabase.from("users").update({ partner_id: null }).eq("id", partner.id);
+    setProfile(p => ({ ...p, partner_id: null }));
+    setFriends([]);
+  }, [profile?.id, friends]);
 
   const handleReset = async () => {
     if (profile?.id) {
@@ -462,7 +530,7 @@ export default function App() {
       <div style={S.content}>
         {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} perfDates={calPerfDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} linkedSoldier={linkedSoldier} onAddNotif={addNotif} viewerName={profile.name}/>}
         {tab==="leave"&&!isGomshin&&<LeaveTab profile={profile} leaves={leaves} perfDates={perfDates} onAddLeave={addLeave} onDelLeave={delLeave}/>}
-        {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setViewingFriendId(id);setTab("cal");}} onAddNotif={addNotif}/>}
+        {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setViewingFriendId(id);setTab("cal");}} onAddNotif={addNotif} onDisconnect={disconnectPartner}/>}
         {tab==="profile"&&<ProfileTab profile={profile} setAuthState={setAuthState} setProfile={async (updater) => {
           const next = typeof updater === "function" ? updater(profile) : updater;
           setProfile(next);
@@ -913,7 +981,7 @@ function LeaveCard({leave,onDelete,past}){
 }
 
 // ===================== 친구 탭 (데모 로직 삭제, 실제 DB 연동만 유지) =====================
-function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal,onAddNotif}){
+function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal,onAddNotif,onDisconnect}){
   const [subTab,setSubTab]=useState("list");
   const [code,setCode]=useState("");
   const [found,setFound]=useState(null);
@@ -938,12 +1006,21 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
     });
   };
 
-  // 연결 요청 (DB 저장 없이 로컬 상태만 — 실제 구현은 Phase 4)
-  const sendRequest=()=>{
-    if(!found)return;
-    const rel=isGomshin?"my_soldier":"friend";
-    setFriends(prev=>[...prev,{...found,id:"f"+Date.now(),relation:rel,status:"accepted"}]);
-    const msg=isGomshin?`${found.name}님의 군화와 연결됐어요!`:`${found.name}님과 연결됐어요!`;
+  // 연결 요청 — 실제 DB에 양방향 partner_id 저장 (PHASE 4)
+  const sendRequest=async()=>{
+    if(!found||!profile?.id)return;
+    // 나의 partner_id 업데이트
+    const { error: e1 } = await supabase.from("users").update({ partner_id: found.id }).eq("id", profile.id);
+    // 상대방의 partner_id 업데이트
+    const { error: e2 } = await supabase.from("users").update({ partner_id: profile.id }).eq("id", found.id);
+    if (e1 || e2) { showToast("연결 실패. 다시 시도해주세요."); return; }
+    // 로컬 profile에 partner_id 반영
+    profile.partner_id = found.id;
+    // 파트너 데이터 로드
+    const rel=isGomshin?"my_soldier":"my_gomshin";
+    const partnerObj={...found,relation:rel,status:"accepted"};
+    setFriends([partnerObj]);
+    const msg=isGomshin?`${found.name}님의 군화와 연결됐어요! 파트너 달력을 확인해보세요 💝`:`${found.name}님과 연결됐어요!`;
     showToast(msg);
     setSubTab("list");setCode("");setFound(null);
   };
@@ -976,7 +1053,10 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
                   <div style={{fontSize:17,fontWeight:800,color:"#fff"}}>{myBf.name}</div>
                   <div style={{fontSize:12,color:"rgba(255,255,255,.7)",marginTop:2}}>D-{Math.max(0,diffDays(today,myBf.discharge))}일 전역까지</div>
                 </div>
-                <button onClick={()=>onViewFriendCal(myBf.id)} style={{padding:"8px 12px",background:"rgba(255,255,255,.9)",color:"#E91E8C",borderRadius:12,border:"none",fontSize:12,fontWeight:800,cursor:"pointer"}}>📅 달력</button>
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                  <button onClick={()=>onViewFriendCal(myBf.id)} style={{padding:"8px 12px",background:"rgba(255,255,255,.9)",color:"#E91E8C",borderRadius:12,border:"none",fontSize:12,fontWeight:800,cursor:"pointer"}}>📅 달력</button>
+                  <button onClick={()=>{if(window.confirm("파트너 연결을 해제할까요?"))onDisconnect();}} style={{padding:"6px 10px",background:"rgba(255,255,255,.2)",color:"rgba(255,255,255,.8)",borderRadius:10,border:"1px solid rgba(255,255,255,.3)",fontSize:11,fontWeight:600,cursor:"pointer"}}>연결해제</button>
+                </div>
               </div>
             </div>
             <div style={{background:"#FFF0F8",borderRadius:16,padding:"14px 16px",border:"1px solid #F8BBD0"}}>
@@ -1010,7 +1090,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
                     {f.userType==="soldier"&&(
                       <button onClick={()=>onViewFriendCal(f.id)} style={{padding:"8px 12px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>📅 달력</button>
                     )}
-                    <button onClick={()=>setFriends(prev=>prev.filter(fr=>fr.id!==f.id))} style={{padding:"8px 10px",background:"#FFF0F1",color:"#F04452",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>삭제</button>
+                    <button onClick={()=>{if(window.confirm("파트너 연결을 해제할까요?"))onDisconnect();}} style={{padding:"8px 10px",background:"#FFF0F1",color:"#F04452",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>연결해제</button>
                   </div>
                 </div>
               ))
