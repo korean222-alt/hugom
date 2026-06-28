@@ -1152,7 +1152,28 @@ function ProfileTab({profile,setProfile,leaves,onReset}){
       {!isGomshin&&<SalaryCalc rankInfo={rankInfo} profile={profile}/>}
       <DdayShareCard profile={profile} rankInfo={rankInfo}/>
 
-      <button onClick={()=>{if(window.confirm("처음부터 다시 설정할까요?\n(등록된 휴가도 모두 삭제됩니다)"))onReset();}} style={{padding:14,borderRadius:14,border:"1.5px solid #FFD0D0",background:"#FFF0F1",fontSize:14,fontWeight:700,color:"#F04452",cursor:"pointer"}}>처음부터 다시 설정</button>
+      <button onClick={async ()=>{
+        if(window.confirm("로그아웃 할까요?")){
+          await supabase.auth.signOut();
+        }
+      }} style={{padding:14,borderRadius:14,border:"1.5px solid #E8ECF0",background:"#F9FAFB",fontSize:14,fontWeight:700,color:"#4E5968",cursor:"pointer"}}>로그아웃</button>
+
+      <button onClick={async ()=>{
+        if(window.confirm("정말 탈퇴할까요?\n모든 데이터가 삭제되고 복구할 수 없어요.")){
+          if(profile?.id){
+            await Promise.all([
+              supabase.from("leaves").delete().eq("user_id",profile.id),
+              supabase.from("schedules").delete().eq("user_id",profile.id),
+              supabase.from("notifications").delete().eq("user_id",profile.id),
+              supabase.from("users").delete().eq("id",profile.id),
+            ]);
+          }
+          await supabase.auth.signOut();
+        }
+      }} style={{padding:14,borderRadius:14,border:"1.5px solid #FFD0D0",background:"#FFF0F1",fontSize:14,fontWeight:700,color:"#F04452",cursor:"pointer"}}>회원탈퇴</button>
+
+      <button onClick={()=>{if(window.confirm("처음부터 다시 설정할까요?\n(등록된 휴가도 모두 삭제됩니다)"))onReset();}} style={{padding:14,borderRadius:14,border:"1.5px solid #E8ECF0",background:"#F9FAFB",fontSize:14,fontWeight:600,color:"#B0B8C1",cursor:"pointer"}}>처음부터 다시 설정</button>
+
       <div style={{textAlign:"center",fontSize:11,color:"#D1D6DB"}}>휴곰 v1.3 · {isGomshin?"곰신 모드":"공군 전용"}</div>
 
       {showRankEdit&&(
