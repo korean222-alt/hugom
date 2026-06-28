@@ -33,7 +33,8 @@ async function signInWithKakao() {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'kakao',
     options: {
-      redirectTo: 'https://hugom.vercel.app',
+      redirectTo: window.location.origin,
+      scopes: 'profile_nickname profile_image',
     },
   });
   if (error) console.error('카카오 로그인 오류:', error);
