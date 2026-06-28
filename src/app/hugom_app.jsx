@@ -7,7 +7,7 @@ const LEAVE_TYPES = {
   annual:  { label:"연가",       icon:"🌿", color:"#05C072", bg:"#E8FBF3", border:"#B7F0D5" },
   reward:  { label:"포상휴가",   icon:"🏅", color:"#3182F6", bg:"#EBF3FF", border:"#A5C9FF" },
   comfort: { label:"위로휴가",   icon:"💜", color:"#7C3AED", bg:"#F3EEFF", border:"#C9B2F8" },
-  perf:    { label:"성과제외박", icon:"⭐", color:"#FF6B00", bg:"#FFF2E8", border:"#FFD0A8" },
+  perf:    { label:"외박", icon:"⭐", color:"#FF6B00", bg:"#FFF2E8", border:"#FFD0A8" },
   outing:  { label:"외출",       icon:"🚶", color:"#FF6B6B", bg:"#FFF0F0", border:"#FFB8B8" },
 };
 const EVENT_TYPES = {
@@ -89,7 +89,7 @@ const isSat = (k) => new Date(k).getDay()===6;
 const isOffDay = (k) => !!HOLIDAYS[k] || new Date(k).getDay()===0 || new Date(k).getDay()===6;
 const fmtDate = (k) => k?k.replace(/-/g,"."):"";
 
-const calcPerfDates = (firstStart,cycleWeeks,cycleDays) => {
+const calcOutingDates = (firstStart,cycleWeeks,cycleDays) => {
   if(!firstStart||!cycleWeeks||!cycleDays) return [];
   const res=[]; let start=firstStart;
   for(let i=0;i<30;i++){
@@ -158,7 +158,7 @@ function LandingPage() {
       <div style={{padding:"20px 20px 0"}}>
         <div className="su" style={{display:"flex",flexDirection:"column",gap:10}}>
           {[
-            {icon:"📅",title:"군인·곰신 함께 보는 휴가 달력",desc:"연가·포상·위로휴가·성과제 외박까지 한눈에"},
+            {icon:"📅",title:"군인·곰신 함께 보는 휴가 달력",desc:"연가·포상·위로휴가·외박까지 한눈에"},
             {icon:"🪖",title:"계급·호봉 자동 계산",desc:"입대일만 입력하면 현재 계급, 진급일 자동 계산"},
             {icon:"🌿",title:"휴가 한도 관리",desc:"종류별 휴가를 등록하고 잔여 한도 관리"},
             {icon:"💌",title:"곰신의 날짜 선택 제안",desc:"원하는 날짜로 휴가·면회를 직접 제안"},
@@ -210,7 +210,7 @@ export default function App() {
   // authState: "loading" | "no_user" | "need_onboarding" | "ready"
   const [authState,setAuthState]=useState("loading");
   const unread=notifs.filter(n=>!n.read).length;
-  const perfDates=useMemo(()=>profile?calcPerfDates(profile.perf_first_start,profile.perf_cycle_weeks,profile.perf_cycle_days):[],[profile]);
+  const outingDates=useMemo(()=>profile?calcOutingDates(profile.perf_first_start,profile.perf_cycle_weeks,profile.perf_cycle_days):[],[profile]);
   const markAllRead=()=>setNotifs(ns=>ns.map(n=>({...n,read:true})));
 
   // 앱 시작 시 인증 상태 + 프로필 확인
@@ -365,7 +365,7 @@ export default function App() {
     if(profile.perf_cycle_days){
       allLeaves.filter(l=>l.leave_type==="perf").forEach(l=>{
         const days=diffDays(l.start_date,l.end_date)+1;
-        if(days>profile.perf_cycle_days) warnings.push(`⭐ 성과제 외박: 설정 ${profile.perf_cycle_days}일 초과 (${days}일 등록됨)`);
+        if(days>profile.perf_cycle_days) warnings.push(`⭐ 외박: 설정 ${profile.perf_cycle_days}일 초과 (${days}일 등록됨)`);
       });
     }
     return warnings.length>0?warnings.join("\n\n"):null;
@@ -501,7 +501,7 @@ export default function App() {
   const viewingFriend=viewingFriendId?friends.find(f=>f.id===viewingFriendId):null;
   const calLeaves=viewingFriend?(viewingFriend.leaves||[]):linkedSoldier?(linkedSoldier.leaves||[]):leaves;
   const calSchedules=viewingFriend?(viewingFriend.schedules||[]):linkedSoldier?(linkedSoldier.schedules||[]):schedules;
-  const calPerfDates=viewingFriend?calcPerfDates(viewingFriend.perf_first_start,viewingFriend.perf_cycle_weeks,viewingFriend.perf_cycle_days):linkedSoldier?calcPerfDates(linkedSoldier.perf_first_start,linkedSoldier.perf_cycle_weeks,linkedSoldier.perf_cycle_days):perfDates;
+  const calOutingDates=viewingFriend?calcOutingDates(viewingFriend.perf_first_start,viewingFriend.perf_cycle_weeks,viewingFriend.perf_cycle_days):linkedSoldier?calcOutingDates(linkedSoldier.perf_first_start,linkedSoldier.perf_cycle_weeks,linkedSoldier.perf_cycle_days):perfDates;
   const calProfile=viewingFriend?viewingFriend:linkedSoldier?linkedSoldier:profile;
   const isGomshin=profile.userType==="gomshin";
   const isReadOnly=!!viewingFriend||!!linkedSoldier;
@@ -528,8 +528,8 @@ export default function App() {
       </header>
       {warnMsg&&<WarnModal msg={warnMsg} onClose={()=>setWarnMsg("")}/>}
       <div style={S.content}>
-        {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} perfDates={calPerfDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} linkedSoldier={linkedSoldier} onAddNotif={addNotif} viewerName={profile.name}/>}
-        {tab==="leave"&&!isGomshin&&<LeaveTab profile={profile} leaves={leaves} perfDates={perfDates} onAddLeave={addLeave} onDelLeave={delLeave}/>}
+        {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} outingDates={calOutingDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} linkedSoldier={linkedSoldier} onAddNotif={addNotif} myName={profile.name}/>}
+        {tab==="leave"&&!isGomshin&&<LeaveTab profile={profile} leaves={leaves} outingDates={perfDates} onAddLeave={addLeave} onDelLeave={delLeave}/>}
         {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setViewingFriendId(id);setTab("cal");}} onAddNotif={addNotif} onDisconnect={disconnectPartner}/>}
         {tab==="profile"&&<ProfileTab profile={profile} setAuthState={setAuthState} setProfile={async (updater) => {
           const next = typeof updater === "function" ? updater(profile) : updater;
@@ -609,7 +609,7 @@ function Onboarding({onComplete}){
         <div className="su" style={{display:"flex",flexDirection:"column",gap:14}}>
           <button onClick={()=>setUserType("soldier")} style={{padding:"22px 20px",borderRadius:20,border:"2px solid #8FA47A",background:"#F2E7D5",cursor:"pointer",textAlign:"left",display:"flex",gap:16,alignItems:"flex-start"}}>
             <div style={{width:48,height:48,borderRadius:14,background:"#556B2F",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,flexShrink:0}}>🐻</div>
-            <div><div style={{fontSize:16,fontWeight:800,color:"#2D4A1E",marginBottom:4}}>군화 (현역 군인)</div><div style={{fontSize:12,color:"#556B2F",lineHeight:1.6}}>휴가 관리 · 성과제 외박 · 계급 자동 계산</div></div>
+            <div><div style={{fontSize:16,fontWeight:800,color:"#2D4A1E",marginBottom:4}}>군화 (현역 군인)</div><div style={{fontSize:12,color:"#556B2F",lineHeight:1.6}}>휴가 관리 · 외박 · 계급 자동 계산</div></div>
           </button>
           <button onClick={()=>setUserType("gomshin")} style={{padding:"22px 20px",borderRadius:20,border:"2px solid #F8BBD0",background:"#FFF5F9",cursor:"pointer",textAlign:"left",display:"flex",gap:16,alignItems:"flex-start"}}>
             <div style={{width:48,height:48,borderRadius:14,background:"#FFF0F8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,flexShrink:0}}>🧸</div>
@@ -667,7 +667,7 @@ function Onboarding({onComplete}){
         <Field label={userType==="gomshin"?"군화 전역 예정일":"전역 예정일"}><input style={S.input} type="date" value={discharge} onChange={e=>setDischarge(e.target.value)}/></Field>
         {userType==="gomshin"&&<div style={{padding:"12px 14px",background:"#FFF0F8",borderRadius:12,fontSize:13,color:"#C2185B",lineHeight:1.6,border:"1px solid #F8BBD0"}}>💡 군화 코드는 나중에 연결 탭에서 입력해요</div>}
         <div style={{padding:"12px 14px",background:"#F9FAFB",borderRadius:12,fontSize:12,color:"#8B95A1",lineHeight:1.8,border:"1px solid #E8ECF0"}}>
-          ✅ <b>설정 탭에서 나중에 할 수 있는 것</b><br/>성과제 외박 주기 · 연가/포상 한도 · 면회외출 텀
+          ✅ <b>설정 탭에서 나중에 할 수 있는 것</b><br/>외박 주기 · 연가/포상 한도 · 면회외출 텀
         </div>
       </div>
       {err&&<div style={{marginTop:12,fontSize:13,color:"#F04452",padding:"10px 14px",background:"#FFF0F1",borderRadius:12,fontWeight:500}}>{err}</div>}
@@ -679,7 +679,7 @@ function Onboarding({onComplete}){
 }
 
 function Field({label,sub,children}){return(<div><div style={{fontSize:13,fontWeight:600,color:"#333D4B",marginBottom:6}}>{label}{sub&&<span style={{fontSize:11,color:"#B0B8C1",marginLeft:6,fontWeight:400}}>{sub}</span>}</div>{children}</div>);}
-function CalendarTab({profile,leaves,schedules,perfDates,onAddLeave,onDelLeave,onAddSched,onDelSched,readOnly,isGomshin,linkedSoldier,onAddNotif,viewerName}){
+function CalendarTab({profile,leaves,schedules,perfDates,onAddLeave,onDelLeave,onAddSched,onDelSched,readOnly,isGomshin,linkedSoldier,onAddNotif,myName}){
   const today=new Date();
   const [vy,setVy]=useState(today.getFullYear());
   const [vm,setVm]=useState(today.getMonth());
@@ -696,11 +696,11 @@ function CalendarTab({profile,leaves,schedules,perfDates,onAddLeave,onDelLeave,o
   const perfStartSet=useMemo(()=>new Set(perfDates.map(p=>p.start)),[perfDates]);
   const leaveByDate=useMemo(()=>{const m={};leaves.forEach(l=>{let d=l.start_date;while(d<=l.end_date){if(!m[d])m[d]=[];m[d].push(l);d=addDays(d,1);}});return m;},[leaves]);
   const schedByDate=useMemo(()=>{const m={};schedules.forEach(s=>{if(!m[s.event_date])m[s.event_date]=[];m[s.event_date].push(s);});return m;},[schedules]);
-  const nextPerf=perfDates.find(p=>p.end>=todayKey);
+  const nextOuting=perfDates.find(p=>p.end>=todayKey);
   const handleGomshinSuggest=(type,dateRange)=>{
     if(!linkedSoldier||!onAddNotif) return;
     const labels={leave_suggest:"🌿 휴가 제안",visit_request:"🏠 영내면회 제안",visit_out_suggest:"🚗 면회외출 제안"};
-    onAddNotif({type,text:`${viewerName}(곰신)님이 ${labels[type]}을 보냈어요 💝`,dateRange:dateRange||null});
+    onAddNotif({type,text:`${myName}(님이 ${labels[type]}을 보냈어요 💝`,dateRange:dateRange||null});
     showToast(`${labels[type]}을 보냈어요!`);setShowGomshinPanel(false);
   };
   return(
@@ -714,7 +714,7 @@ function CalendarTab({profile,leaves,schedules,perfDates,onAddLeave,onDelLeave,o
               <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{fontSize:42,fontWeight:900,color:"#fff",lineHeight:1}}>D-{diffDays(todayKey,profile.discharge)}</div><div style={{fontSize:28}}>🐻</div></div>
               <div style={{fontSize:12,color:"rgba(255,255,255,.6)",marginTop:6}}>{profile.discharge} 전역예정</div>
             </div>
-            {nextPerf&&(<div style={{textAlign:"right",background:"rgba(255,255,255,.15)",borderRadius:12,padding:"10px 14px"}}><div style={{fontSize:10,color:"rgba(255,255,255,.65)",marginBottom:4}}>다음 성과제 외박</div><div style={{fontSize:13,fontWeight:700,color:"#FFD966"}}>{nextPerf.start}</div><div style={{fontSize:11,color:"rgba(255,255,255,.5)"}}>D-{Math.max(0,diffDays(todayKey,nextPerf.start))}일 후</div></div>)}
+            {nextOuting&&(<div style={{textAlign:"right",background:"rgba(255,255,255,.15)",borderRadius:12,padding:"10px 14px"}}><div style={{fontSize:10,color:"rgba(255,255,255,.65)",marginBottom:4}}>다음 외박</div><div style={{fontSize:13,fontWeight:700,color:"#FFD966"}}>{nextOuting.start}</div><div style={{fontSize:11,color:"rgba(255,255,255,.5)"}}>D-{Math.max(0,diffDays(todayKey,nextOuting.start))}일 후</div></div>)}
           </div>
         </div>
       </div>
@@ -754,7 +754,7 @@ function CalendarTab({profile,leaves,schedules,perfDates,onAddLeave,onDelLeave,o
               {isPerf&&dayLeaves.length===0&&(isPerfStart?<div style={{fontSize:7,fontWeight:700,color:"#FF6B00",background:"#FFF2E8",borderRadius:3,padding:"1px 3px",display:"inline-block"}}>⭐{perfIdx+1}차</div>:<div style={{height:2,background:"#FBBF24",borderRadius:1,margin:"3px 2px 0",opacity:0.5}}/>)}
               <div style={{display:"flex",flexDirection:"column",gap:1.5,marginTop:1}}>
                 {dayLeaves.slice(0,2).map((l,i)=>{const lt=LEAVE_TYPES[l.leave_type];if(!lt)return null;return(<div key={i} style={{fontSize:7.5,fontWeight:700,borderRadius:4,padding:"2px 4px",background:lt.color,color:"#fff",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",display:"flex",alignItems:"center",gap:2}}><span>{lt.icon}</span><span>{lt.label}</span></div>);})}
-                {dayScheds.slice(0,1).map((s,i)=>{const et=EVENT_TYPES[s.event_type];if(!et)return null;return(<div key={i} style={{fontSize:7.5,fontWeight:700,borderRadius:4,padding:"2px 4px",background:et.bg,color:et.color,border:`1px solid ${et.border}`,overflow:"hidden",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:2}}><span>{et.icon}</span><span>{et.label}</span></div>);})}
+                {dayScheds.slice(0,1).map((s,i)=>{const et=EVENT_TYPES[s.event_type];if(!et)return null;return(<div key={i} style={{fontSize:7.5,fontWeight:700,borderRadius:4,padding:"2px 4px",background:et.bg,color:et.color,border:`1px solid ${et.border}`,overflow:"hidden",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:2}}><span>{et.icon}</span><span>{s.title || et.label}</span></div>);})}
               </div>
             </div>
           );
@@ -765,7 +765,7 @@ function CalendarTab({profile,leaves,schedules,perfDates,onAddLeave,onDelLeave,o
       </div>
       {showModal&&selKey&&<EventModal dateKey={selKey} leaves={leaves} schedules={schedules} profile={profile} onAddLeave={onAddLeave} onDelLeave={onDelLeave} onAddSched={onAddSched} onDelSched={onDelSched} onClose={()=>setShowModal(false)}/>}
       {showPicker&&<MultiRangePicker onClose={()=>setShowPicker(false)} onDone={(ls)=>{onAddLeave(ls);setShowPicker(false);}}/>}
-      {showGomshinPanel&&linkedSoldier&&<GomshinSuggestPanel soldierName={linkedSoldier.name} onSend={handleGomshinSuggest} onClose={()=>setShowGomshinPanel(false)}/>}
+      {showGomshinPanel&&linkedSoldier&&<GomshinSuggestPanel partnerName={linkedSoldier.name} onSend={handleGomshinSuggest} onClose={()=>setShowGomshinPanel(false)}/>}
     </div>
   );
 }
@@ -809,9 +809,10 @@ function EventModal({dateKey,leaves,schedules,profile,onAddLeave,onDelLeave,onAd
         </div>
         {dayLeaves.length>0&&<><div style={S.sectionTitle}>등록된 휴가</div>{dayLeaves.map(l=>{const lt=LEAVE_TYPES[l.leave_type];if(!lt)return null;return(<div key={l.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,background:lt.bg,border:`1px solid ${lt.border}`,marginBottom:6}}><span style={{fontSize:18}}>{lt.icon}</span><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:lt.color}}>{lt.label}</div><div style={{fontSize:11,color:"#8B95A1"}}>{l.start_date} ~ {l.end_date}</div></div><button onClick={()=>onDelLeave(l.id)} style={{fontSize:12,color:"#F04452",fontWeight:700,padding:"4px 8px",background:"rgba(240,68,82,.08)",borderRadius:6,border:"none",cursor:"pointer"}}>삭제</button></div>);})}</>}
         {dayScheds.length>0&&<><div style={{...S.sectionTitle,marginTop:14}}>등록된 일정</div>{dayScheds.map(s=>{const et=EVENT_TYPES[s.event_type];if(!et)return null;return(<div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,background:et.bg,border:`1px solid ${et.border}`,marginBottom:6}}><span style={{fontSize:18}}>{et.icon}</span><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:et.color}}>{et.label}</div>{s.memo&&<div style={{fontSize:11,color:"#8B95A1"}}>{s.memo}</div>}</div><button onClick={()=>onDelSched(s.id)} style={{fontSize:12,color:"#F04452",fontWeight:700,padding:"4px 8px",background:"rgba(240,68,82,.08)",borderRadius:6,border:"none",cursor:"pointer"}}>삭제</button></div>);})}</>}
+        <div style={{fontSize:10,color:"#F04452",fontWeight:600,marginBottom:8,lineHeight:1.4}}>⚠️ 군사보안 위반 관련 글 작성 시 법적 책임은 본인에게 있습니다</div>
         <div style={{...S.sectionTitle,marginTop:16}}>일정 추가</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12}}>
-          {Object.entries(EVENT_TYPES).map(([k,v])=>{const disabled=k==="visit_in"&&!offday;return(<button key={k} onClick={()=>{if(!disabled){setEvType(k);setVisitOutWarn(null);setConfirmOverride(false);}}} style={{...S.chip,borderColor:evType===k&&!disabled?v.color:"#E8ECF0",background:evType===k&&!disabled?v.bg:"#fff",color:evType===k&&!disabled?v.color:"#4E5968",opacity:disabled?.4:1,cursor:disabled?"not-allowed":"pointer"}}>{v.icon} {v.label}{k==="visit_in"&&!offday?<span style={{fontSize:9,marginLeft:3,opacity:.7}}>쉬는날만</span>:null}</button>);})}
+          {Object.entries(EVENT_TYPES).map(([k,v])=>{const disabled=false;return(<button key={k} onClick={()=>{if(!disabled){setEvType(k);setVisitOutWarn(null);setConfirmOverride(false);}}} style={{...S.chip,borderColor:evType===k&&!disabled?v.color:"#E8ECF0",background:evType===k&&!disabled?v.bg:"#fff",color:evType===k&&!disabled?v.color:"#4E5968",opacity:disabled?.4:1,cursor:disabled?"not-allowed":"pointer"}}>{v.icon} {v.label}</button>);})}
         </div>
         {visitOutWarn&&!confirmOverride&&(
           <div style={{marginBottom:12,padding:"14px 16px",background:"#FFF8E8",borderRadius:14,border:"1.5px solid #FFCC80"}}>
@@ -828,7 +829,7 @@ function EventModal({dateKey,leaves,schedules,profile,onAddLeave,onDelLeave,onAd
     </div>
   );
 }
-function GomshinSuggestPanel({soldierName,onSend,onClose}){
+function GomshinSuggestPanel({partnerName,onSend,onClose}){
   const [step,setStep]=useState("type");const [selectedType,setSelectedType]=useState(null);const [dateStart,setDateStart]=useState(null);const [dateEnd,setDateEnd]=useState(null);const [hoverKey,setHoverKey]=useState(null);
   const today=new Date();const [vy,setVy]=useState(today.getFullYear());const [vm,setVm]=useState(today.getMonth());
   const SUGGEST_TYPES=[{type:"leave_suggest",icon:"🌿",label:"휴가 제안",desc:"이때 휴가 나와줘!",color:"#05C072",bg:"#E8FBF3",border:"#B7F0D5"},{type:"visit_request",icon:"🏠",label:"영내면회 제안",desc:"면회 갈게!",color:"#3182F6",bg:"#EBF3FF",border:"#A5C9FF"},{type:"visit_out_suggest",icon:"🚗",label:"면회외출 제안",desc:"같이 외출하자!",color:"#7C3AED",bg:"#F3EEFF",border:"#C9B2F8"}];
@@ -843,7 +844,7 @@ function GomshinSuggestPanel({soldierName,onSend,onClose}){
       <div className="su" style={{...S.sheet,paddingBottom:32}} onClick={e=>e.stopPropagation()}>
         <div style={S.handle}/>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
-          <div><div style={{fontSize:17,fontWeight:800}}>💌 {soldierName}에게 제안</div></div>
+          <div><div style={{fontSize:17,fontWeight:800}}>💌 {partnerName}에게 제안</div></div>
           {step!=="type"&&<button onClick={()=>setStep("type")} style={{fontSize:12,color:"#8B95A1",background:"#F2F4F6",border:"none",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontWeight:600}}>← 이전</button>}
         </div>
         {step==="type"&&(<div style={{display:"flex",flexDirection:"column",gap:10}}>{SUGGEST_TYPES.map(item=>(<button key={item.type} onClick={()=>{setSelectedType(item.type);setStep("date");}} style={{padding:"14px 16px",borderRadius:16,border:`1.5px solid ${item.border}`,background:item.bg,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:14}}><div style={{width:44,height:44,borderRadius:12,background:item.color+"22",border:`1.5px solid ${item.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>{item.icon}</div><div><div style={{fontSize:15,fontWeight:700,color:item.color}}>{item.label}</div><div style={{fontSize:12,color:"#8B95A1",marginTop:2}}>{item.desc}</div></div></button>))}</div>)}
@@ -935,7 +936,7 @@ function LeaveTab({profile,leaves,perfDates,onAddLeave,onDelLeave}){
   const rankInfo=calcRankInfo(profile.enlist,profile.missedMonths);
   const {currentRank,hobon,nextRankKey}=rankInfo;
   const usedDays=(type)=>leaves.filter(l=>l.leave_type===type).reduce((acc,l)=>acc+diffDays(l.start_date,l.end_date)+1,0);
-  const nextPerf=perfDates.find(p=>p.end>=today);
+  const nextOuting=perfDates.find(p=>p.end>=today);
   const upcoming=leaves.filter(l=>l.end_date>=today).sort((a,b)=>a.start_date.localeCompare(b.start_date));
   const past=leaves.filter(l=>l.end_date<today).sort((a,b)=>b.start_date.localeCompare(a.start_date));
   const annualUsed=usedDays("annual");const annualLimit=profile.annual_limits?.[currentRank];
@@ -966,7 +967,7 @@ function LeaveTab({profile,leaves,perfDates,onAddLeave,onDelLeave}){
           </div>);
         })}
       </div>
-      {nextPerf&&(<div style={{background:"#FFF2E8",borderRadius:16,padding:"14px 16px",border:"1px solid #FFD0A8",display:"flex",alignItems:"center",gap:12}}><span style={{fontSize:28}}>⭐</span><div><div style={{fontSize:11,color:"#FF6B00",fontWeight:700}}>{nextPerf.idx+1}차 성과제 외박</div><div style={{fontSize:16,fontWeight:800,marginTop:2}}>{nextPerf.start} ~ {nextPerf.end}</div><div style={{fontSize:12,color:"#8B95A1",marginTop:2}}>D-{Math.max(0,diffDays(today,nextPerf.start))}일 후 · {nextPerf.days}일</div></div></div>)}
+      {nextOuting&&(<div style={{background:"#FFF2E8",borderRadius:16,padding:"14px 16px",border:"1px solid #FFD0A8",display:"flex",alignItems:"center",gap:12}}><span style={{fontSize:28}}>⭐</span><div><div style={{fontSize:11,color:"#FF6B00",fontWeight:700}}>{nextOuting.idx+1}차 외박</div><div style={{fontSize:16,fontWeight:800,marginTop:2}}>{nextOuting.start} ~ {nextOuting.end}</div><div style={{fontSize:12,color:"#8B95A1",marginTop:2}}>D-{Math.max(0,diffDays(today,nextOuting.start))}일 후 · {nextOuting.days}일</div></div></div>)}
       {upcoming.length>0&&<><div style={S.sectionTitle}>다가오는 휴가</div>{upcoming.map(l=><LeaveCard key={l.id} leave={l} onDelete={()=>onDelLeave(l.id)}/>)}</>}
       {past.length>0&&<><div style={{...S.sectionTitle,marginTop:4}}>지난 휴가</div>{past.map(l=><LeaveCard key={l.id} leave={l} onDelete={()=>onDelLeave(l.id)} past/>)}</>}
       <button style={{...S.btn,background:"#3182F6",color:"#fff",boxShadow:"0 4px 14px rgba(49,130,246,.28)"}} onClick={()=>setShowPicker(true)}>+ 휴가 등록</button>
@@ -1028,7 +1029,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
   const handleGomshinSend=(type,dateRange)=>{
     if(!myBf||!onAddNotif)return;
     const labels={leave_suggest:"🌿 휴가 제안",visit_request:"🏠 영내면회 제안",visit_out_suggest:"🚗 면회외출 제안"};
-    onAddNotif({type,text:`${profile.name}(곰신)님이 ${labels[type]}을 보냈어요 💝`,dateRange});
+    onAddNotif({type,text:`${profile.name}(님이 ${labels[type]}을 보냈어요 💝`,dateRange});
     showToast(`${labels[type]}을 보냈어요!`);
     setShowGomshinSuggest(false);
   };
@@ -1076,21 +1077,26 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
           {!isGomshin&&<>
             {accepted.length>0
               ? accepted.map(f=>(
-                <div key={f.id} style={{...S.card,display:"flex",alignItems:"center",gap:12}}>
-                  <div style={{width:44,height:44,borderRadius:14,background:"#F2F4F6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>
-                    {f.userType==="soldier"?"🪖":"💝"}
-                  </div>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:15,fontWeight:700,color:"#191F28"}}>{f.name}</div>
-                    <div style={{fontSize:12,color:"#8B95A1",marginTop:2}}>
-                      {f.userType==="soldier"?`D-${Math.max(0,diffDays(today,f.discharge))}일 전역까지`:"연결된 친구"}
+                <div key={f.id} style={{display:"flex",flexDirection:"column",gap:8}}>
+                  <div style={{...S.card,display:"flex",alignItems:"center",gap:12}}>
+                    <div style={{width:44,height:44,borderRadius:14,background:"#F2F4F6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>
+                      {f.userType==="soldier"?"🪖":"💝"}
+                    </div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:15,fontWeight:700,color:"#191F28"}}>{f.name}</div>
+                      <div style={{fontSize:12,color:"#8B95A1",marginTop:2}}>
+                        {f.userType==="soldier"?`D-${Math.max(0,diffDays(today,f.discharge))}일 전역까지`:"연결된 친구"}
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:6}}>
+                      <button onClick={()=>onViewFriendCal(f.id)} style={{padding:"8px 12px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>📅 달력</button>
+                      <button onClick={()=>{if(window.confirm("파트너 연결을 해제할까요?"))onDisconnect();}} style={{padding:"8px 10px",background:"#FFF0F1",color:"#F04452",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>연결해제</button>
                     </div>
                   </div>
-                  <div style={{display:"flex",gap:6}}>
-                    {f.userType==="soldier"&&(
-                      <button onClick={()=>onViewFriendCal(f.id)} style={{padding:"8px 12px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>📅 달력</button>
-                    )}
-                    <button onClick={()=>{if(window.confirm("파트너 연결을 해제할까요?"))onDisconnect();}} style={{padding:"8px 10px",background:"#FFF0F1",color:"#F04452",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>연결해제</button>
+                  {/* 군화 전용 제안 버튼 */}
+                  <div style={{background:"#EBF3FF",borderRadius:16,padding:"12px 14px",border:"1px solid #A5C9FF",marginBottom:10}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#3182F6",marginBottom:8}}>✈️ 휴가/면회 같이 쓰자고 제안하기</div>
+                    <button onClick={()=>{setFound(f);setShowGomshinSuggest(true);}} style={{...S.btn,background:"#3182F6",color:"#fff",padding:"10px",fontSize:14}}>💌 날짜 선택해서 제안 보내기</button>
                   </div>
                 </div>
               ))
@@ -1104,13 +1110,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
             }
           </>}
 
-          {/* 준비 중 안내 */}
-          <div style={{padding:"12px 14px",background:"#F9FAFB",borderRadius:12,border:"1px solid #E8ECF0",display:"flex",alignItems:"center",gap:10}}>
-            <span style={{fontSize:16}}>🔧</span>
-            <div style={{fontSize:12,color:"#8B95A1",lineHeight:1.6}}>
-              <span style={{fontWeight:700,color:"#4E5968"}}>알림·면회 요청 기능</span>은 곧 업데이트될 예정이에요
-            </div>
-          </div>
+
         </div>
       )}
 
@@ -1120,7 +1120,16 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
           <div style={{background:isGomshin?"linear-gradient(135deg,#FF4081,#E91E8C)":"#EBF3FF",borderRadius:20,padding:18,border:isGomshin?"none":"1px solid #A5C9FF"}}>
             <div style={{fontSize:12,color:isGomshin?"rgba(255,255,255,.8)":"#3182F6",fontWeight:700,marginBottom:8}}>내 초대 코드</div>
             <div style={{fontSize:34,fontWeight:900,color:isGomshin?"#fff":"#3182F6",letterSpacing:6,textAlign:"center",marginBottom:10}}>{profile.invite_code}</div>
-            <button onClick={()=>{ navigator.clipboard?.writeText(profile.invite_code); showToast("코드가 복사됐어요!"); }} style={{...S.btn,background:isGomshin?"rgba(255,255,255,.2)":"#3182F6",color:"#fff",boxShadow:"none",border:isGomshin?"1px solid rgba(255,255,255,.3)":"none"}}>코드 복사</button>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>{ navigator.clipboard?.writeText(profile.invite_code); showToast("코드가 복사됐어요!"); }} style={{...S.btn,flex:1,background:isGomshin?"rgba(255,255,255,.2)":"#3182F6",color:"#fff",boxShadow:"none",border:isGomshin?"1px solid rgba(255,255,255,.3)":"none"}}>코드 복사</button>
+              <button onClick={()=>{
+                if(navigator.share){
+                  navigator.share({title:"휴곰 초대 코드", text:`휴곰에서 저와 연결해요! 초대 코드: ${profile.invite_code}`, url:window.location.origin});
+                } else {
+                  showToast("공유 기능을 지원하지 않는 브라우저입니다.");
+                }
+              }} style={{...S.btn,flex:1,background:isGomshin?"#fff":"#F2F4F6",color:isGomshin?"#E91E8C":"#4E5968",boxShadow:"none",border:"none"}}>공유하기</button>
+            </div>
           </div>
 
           {/* 코드 검색 */}
@@ -1149,7 +1158,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
         </div>
       )}
 
-      {showGomshinSuggest&&myBf&&<GomshinSuggestPanel soldierName={myBf.name} onSend={handleGomshinSend} onClose={()=>setShowGomshinSuggest(false)}/>}
+      {showGomshinSuggest&&myBf&&<GomshinSuggestPanel partnerName={myBf.name} onSend={handleGomshinSend} onClose={()=>setShowGomshinSuggest(false)}/>}
     </div>
   );
 }
@@ -1170,7 +1179,7 @@ function ProfileTab({profile,setProfile,leaves,onReset,setAuthState}){
       <div style={{background:isGomshin?"linear-gradient(135deg,#FF4081,#E91E8C)":"linear-gradient(135deg,#2D4A1E,#556B2F)",borderRadius:20,padding:20,boxShadow:isGomshin?"0 4px 16px rgba(233,30,140,.28)":"0 4px 16px rgba(61,90,30,.35)"}}>
         <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
           <div style={{width:52,height:52,borderRadius:16,background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>{isGomshin?"💝":"✈️"}</div>
-          <div><div style={{fontSize:20,fontWeight:800,color:"#fff"}}>{profile.name}</div><div style={{fontSize:12,color:"rgba(255,255,255,.65)",marginTop:2}}>{isGomshin?"기다리는 중 💝":rankInfo?`공군 복무 중 · ${rankInfo.currentRank} ${rankInfo.hobon}호봉`:"공군 복무 중"}</div></div>
+          <div><div style={{fontSize:20,fontWeight:800,color:"#fff"}}>{profile.name}</div><div style={{fontSize:12,color:"rgba(255,255,255,.65)",marginTop:2}}>{isGomshin?"기다리는 중 💝":rankInfo?`복무 중 · ${rankInfo.currentRank} ${rankInfo.hobon}호봉`:"복무 중"}</div></div>
         </div>
         <div style={{background:"rgba(255,255,255,.15)",borderRadius:12,padding:"12px 16px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
@@ -1256,7 +1265,7 @@ function ProfileTab({profile,setProfile,leaves,onReset,setAuthState}){
         </button>
       </div>
 
-      <div style={{textAlign:"center",fontSize:11,color:"#D1D6DB"}}>휴곰 v1.3 · {isGomshin?"곰신 모드":"공군 전용"}</div>
+      <div style={{textAlign:"center",fontSize:11,color:"#D1D6DB"}}>휴곰 v1.3 · {isGomshin?"곰신 모드":"군화 모드"}</div>
 
       {showRankEdit&&(
         <div className="fi" style={S.overlay} onClick={()=>setShowRankEdit(false)}>
@@ -1286,15 +1295,15 @@ function PerfSetupInline({profile,setProfile}){
   if(!open) return(
     <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid #F2F4F6"}}>
       {profile.perf_first_start
-        ?<button onClick={()=>setOpen(true)} style={{width:"100%",padding:"8px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"1px solid #A5C9FF",fontSize:13,fontWeight:700,cursor:"pointer"}}>⭐ 성과제 외박 수정</button>
-        :<><div style={{fontSize:12,color:"#B0B8C1",marginBottom:8}}>성과제 외박 일정이 미설정이에요</div><button onClick={()=>setOpen(true)} style={{width:"100%",padding:"8px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"1px solid #A5C9FF",fontSize:13,fontWeight:700,cursor:"pointer"}}>⭐ 성과제 외박 설정하기</button></>
+        ?<button onClick={()=>setOpen(true)} style={{width:"100%",padding:"8px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"1px solid #A5C9FF",fontSize:13,fontWeight:700,cursor:"pointer"}}>⭐ 외박 수정 (공군 성과제)</button>
+        :<><div style={{fontSize:12,color:"#B0B8C1",marginBottom:8}}>외박 일정이 미설정이에요</div><button onClick={()=>setOpen(true)} style={{width:"100%",padding:"8px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"1px solid #A5C9FF",fontSize:13,fontWeight:700,cursor:"pointer"}}>⭐ 외박 설정하기 (공군 성과제)</button></>
       }
     </div>
   );
   return(
     <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid #F2F4F6"}}>
-      <div style={{fontSize:13,fontWeight:700,color:"#191F28",marginBottom:12}}>⭐ 성과제 외박 설정</div>
-      <div style={{marginBottom:10}}><div style={{fontSize:12,color:"#8B95A1",marginBottom:5}}>첫 성과제 외박 시작일</div><input style={S.input} type="date" value={perfFirst} onChange={e=>setPerfFirst(e.target.value)}/></div>
+      <div style={{fontSize:13,fontWeight:700,color:"#191F28",marginBottom:12}}>⭐ 외박 설정</div>
+      <div style={{marginBottom:10}}><div style={{fontSize:12,color:"#8B95A1",marginBottom:5}}>첫 외박 시작일</div><input style={S.input} type="date" value={perfFirst} onChange={e=>setPerfFirst(e.target.value)}/></div>
       <div style={{marginBottom:12}}><div style={{fontSize:12,color:"#8B95A1",marginBottom:5}}>주기</div><div style={{display:"flex",gap:6}}>{cycleOpts.map(o=>(<button key={o.w} onClick={()=>{setCycleW(o.w);setCycleD(o.d);}} style={{flex:1,padding:"8px 4px",borderRadius:10,border:`2px solid ${cycleW===o.w?"#3182F6":"#E8ECF0"}`,background:cycleW===o.w?"#EBF3FF":"#F9FAFB",cursor:"pointer",fontSize:12,fontWeight:700,color:cycleW===o.w?"#3182F6":"#4E5968"}}>{o.label}<br/><span style={{fontSize:10,fontWeight:400,color:"#8B95A1"}}>{o.desc}</span></button>))}</div></div>
       <div style={{display:"flex",gap:8}}><button onClick={()=>setOpen(false)} style={{flex:1,padding:10,borderRadius:10,border:"1.5px solid #E8ECF0",background:"#fff",fontSize:13,fontWeight:600,color:"#8B95A1",cursor:"pointer"}}>취소</button><button onClick={save} disabled={!perfFirst||!cycleW} style={{flex:2,padding:10,borderRadius:10,border:"none",background:perfFirst&&cycleW?"#3182F6":"#E8ECF0",color:perfFirst&&cycleW?"#fff":"#B0B8C1",fontSize:13,fontWeight:700,cursor:perfFirst&&cycleW?"pointer":"default"}}>저장</button></div>
     </div>
@@ -1410,15 +1419,65 @@ function ServiceTimeline({profile,rankInfo,leaves}){
     </div>
   );
 }
-function SalaryCalc({rankInfo,profile}){
-  const [open,setOpen]=useState(false);
-  const [selRank,setSelRank]=useState(rankInfo?.currentRank||"일병");
-  const [showSaving,setShowSaving]=useState(false);
-  const [savingAmt,setSavingAmt]=useState(550000);
-  const [showTotal,setShowTotal]=useState(false);
-  const base=SOLDIER_PAY[selRank]||0;
-  const fmtWon=(n)=>n.toLocaleString("ko-KR")+"원";
-  const fmtMan=(n)=>`${Math.floor(n/10000).toLocaleString()}만원`;
+function SalaryCalc({rankInfo, profile}){
+  const [open, setOpen] = useState(false);
+  const [durations, setDurations] = useState({ 이등병: 2, 일병: 6, 상병: 6, 병장: 4 }); // 기본값
+  
+  const totalSalary = useMemo(() => {
+    let total = 0;
+    RANK_LABELS.forEach(r => {
+      total += SOLDIER_PAY[r] * (durations[r] || 0);
+    });
+    return total;
+  }, [durations]);
+
+  const totalSavings = useMemo(() => {
+    const months = Object.values(durations).reduce((a, b) => a + b, 0);
+    return (totalSalary + (NAEILJUN_MAX * months)) * 1.05; // 대략적인 이자 포함
+  }, [totalSalary, durations]);
+
+  if (!open) return (
+    <div style={S.card}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:14,fontWeight:700}}>💰 예상 전역 적금</div>
+          <div style={{fontSize:18,fontWeight:900,color:"#3182F6",marginTop:4}}>약 {Math.round(totalSavings/10000).toLocaleString()}만원</div>
+        </div>
+        <button onClick={()=>setOpen(true)} style={{fontSize:12,color:"#3182F6",fontWeight:700,background:"#EBF3FF",border:"none",borderRadius:8,padding:"8px 12px",cursor:"pointer"}}>기간 설정</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="fi" style={S.overlay} onClick={()=>setOpen(false)}>
+      <div className="su" style={S.sheet} onClick={e=>e.stopPropagation()}>
+        <div style={S.handle}/>
+        <div style={{fontSize:16,fontWeight:800,marginBottom:18}}>계급별 복무 기간 설정</div>
+        <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:20}}>
+          {RANK_LABELS.map(r => (
+            <div key={r} style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <span style={{fontSize:14,fontWeight:600,color:"#4E5968"}}>{r}</span>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <input 
+                  type="number" 
+                  value={durations[r]} 
+                  onChange={e => setDurations(prev => ({...prev, [r]: parseInt(e.target.value) || 0}))}
+                  style={{...S.input, width:60, textAlign:"center", padding:"8px"}}
+                />
+                <span style={{fontSize:13,color:"#8B95A1"}}>개월</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{background:"#F9FAFB",borderRadius:12,padding:"14px",marginBottom:20}}>
+          <div style={{fontSize:12,color:"#8B95A1",marginBottom:4}}>예상 총 수령액 (월급+내일준비적금)</div>
+          <div style={{fontSize:20,fontWeight:900,color:"#191F28"}}>{Math.round(totalSavings).toLocaleString()}원</div>
+        </div>
+        <button style={{...S.btn,background:"#3182F6",color:"#fff"}} onClick={()=>setOpen(false)}>확인</button>
+      </div>
+    </div>
+  );
+}만원`;
 
   const totalSalaryCalc=useMemo(()=>{
     if(!profile||!rankInfo) return null;
