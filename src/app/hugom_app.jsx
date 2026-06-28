@@ -129,96 +129,62 @@ function WarnModal({ msg, onClose }) {
 
 // ===================== 랜딩 페이지 (로그인 전) =====================
 function LandingPage() {
-  const features = [
-    { icon:"📅", title:"군인·곰신 함께 보는 휴가 달력", desc:"연가·포상·위로휴가·성과제 외박까지 한눈에. 서로의 일정을 실시간으로 공유해요." },
-    { icon:"🪖", title:"계급·호봉 자동 계산", desc:"입대일만 입력하면 현재 계급, 호봉, 진급일까지 자동으로 계산해줘요." },
-    { icon:"🌿", title:"휴가 한도 관리", desc:"연가·포상휴가·위로휴가·성과제 외박을 등록하고 잔여 한도를 관리해요." },
-    { icon:"💌", title:"곰신의 날짜 선택 제안", desc:"곰신이 원하는 날짜를 선택해서 휴가·영내면회·면회외출을 직접 제안할 수 있어요." },
-    { icon:"💰", title:"월급·장병내일준비적금 계산기", desc:"계급별 월급과 전역 시 예상 적금 수령액을 바로 계산해요." },
-    { icon:"📤", title:"전역 D-day 카드 공유", desc:"예쁜 전역 카운트다운 카드를 만들어 카카오톡·인스타그램에 공유해요." },
-  ];
-
   return (
     <div style={{...S.wrap, overflowY:"auto"}}>
       <style>{`*{box-sizing:border-box;margin:0;padding:0;}button:active{transform:scale(0.97)!important;}::-webkit-scrollbar{display:none;}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}.su{animation:slideUp .35s cubic-bezier(.34,1.2,.64,1);}.fi{animation:fadeIn .4s ease;}`}</style>
 
-      {/* 히어로 섹션 */}
-      <div style={{background:"linear-gradient(160deg,#1E3A0F 0%,#2D4A1E 40%,#3D6B2A 80%,#556B2F 100%)",padding:"52px 24px 40px",position:"relative",overflow:"hidden"}}>
+      <div style={{background:"linear-gradient(160deg,#1E3A0F 0%,#2D4A1E 40%,#3D6B2A 80%,#556B2F 100%)",padding:"48px 24px 32px",position:"relative",overflow:"hidden"}}>
         <div style={{position:"absolute",top:-60,right:-40,width:220,height:220,borderRadius:"50%",background:"rgba(255,255,255,.05)"}}/>
-        <div style={{position:"absolute",bottom:-80,left:-30,width:160,height:160,borderRadius:"50%",background:"rgba(0,0,0,.12)"}}/>
         <div className="fi" style={{position:"relative"}}>
-          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
-            <div style={{fontSize:52}}>🐻</div>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+            <div style={{fontSize:48}}>🐻</div>
             <div>
-              <div style={{fontSize:36,fontWeight:900,color:"#fff",lineHeight:1}}>휴곰</div>
-              <div style={{fontSize:13,color:"rgba(255,255,255,.6)",marginTop:2}}>군인과 곰신의 휴가 관리</div>
+              <div style={{fontSize:34,fontWeight:900,color:"#fff",lineHeight:1}}>휴곰</div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,.6)",marginTop:2}}>군인과 곰신의 휴가 관리</div>
             </div>
           </div>
-          <div style={{fontSize:18,fontWeight:700,color:"rgba(255,255,255,.95)",lineHeight:1.5,marginBottom:8}}>
+          <div style={{fontSize:17,fontWeight:700,color:"rgba(255,255,255,.95)",lineHeight:1.5}}>
             입대일 입력 하나로<br/>
             <span style={{color:"#A8D5A2"}}>모든 휴가 관리를 자동으로</span>
           </div>
-          <div style={{fontSize:13,color:"rgba(255,255,255,.6)",lineHeight:1.6}}>
-            군인과 곰신이 함께 쓰는 스마트한 휴가 캘린더
-          </div>
         </div>
       </div>
 
-      {/* 핵심 기능 소개 */}
-      <div style={{padding:"28px 20px 0"}}>
-        <div style={{fontSize:12,fontWeight:700,color:"#8B95A1",letterSpacing:"0.08em",marginBottom:16}}>주요 기능</div>
-        <div className="su" style={{display:"flex",flexDirection:"column",gap:12}}>
-          {features.map((f, i) => (
-            <div key={i} style={{display:"flex",gap:14,padding:"14px 16px",background:"#F9FAFB",borderRadius:16,border:"1px solid #F0F2F5",alignItems:"flex-start"}}>
-              <div style={{width:44,height:44,borderRadius:13,background:"linear-gradient(135deg,#2D4A1E,#556B2F)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
-                {f.icon}
-              </div>
-              <div>
-                <div style={{fontSize:14,fontWeight:700,color:"#191F28",marginBottom:3}}>{f.title}</div>
-                <div style={{fontSize:12,color:"#6B7685",lineHeight:1.6}}>{f.desc}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 사용 방법 */}
-      <div style={{padding:"28px 20px 0"}}>
-        <div style={{fontSize:12,fontWeight:700,color:"#8B95A1",letterSpacing:"0.08em",marginBottom:14}}>이용 방법</div>
-        <div style={{display:"flex",flexDirection:"column",gap:0,background:"#F9FAFB",borderRadius:16,overflow:"hidden",border:"1px solid #F0F2F5"}}>
+      <div style={{padding:"20px 20px 0"}}>
+        <div className="su" style={{display:"flex",flexDirection:"column",gap:10}}>
           {[
-            {num:"01", text:"카카오로 1초 로그인"},
-            {num:"02", text:"군화 또는 곰신 선택"},
-            {num:"03", text:"입대일·전역일 입력"},
-            {num:"04", text:"친구 코드로 서로 연결"},
-          ].map((step, i, arr) => (
-            <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"13px 16px",borderBottom:i<arr.length-1?"1px solid #EEF0F3":"none"}}>
-              <div style={{width:28,height:28,borderRadius:9,background:"linear-gradient(135deg,#2D4A1E,#556B2F)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <span style={{fontSize:11,fontWeight:800,color:"#fff"}}>{step.num}</span>
+            {icon:"📅",title:"군인·곰신 함께 보는 휴가 달력",desc:"연가·포상·위로휴가·성과제 외박까지 한눈에"},
+            {icon:"🪖",title:"계급·호봉 자동 계산",desc:"입대일만 입력하면 현재 계급, 진급일 자동 계산"},
+            {icon:"🌿",title:"휴가 한도 관리",desc:"종류별 휴가를 등록하고 잔여 한도 관리"},
+            {icon:"💌",title:"곰신의 날짜 선택 제안",desc:"원하는 날짜로 휴가·면회를 직접 제안"},
+          ].map((f,i)=>(
+            <div key={i} style={{display:"flex",gap:12,padding:"12px 14px",background:"#F9FAFB",borderRadius:14,border:"1px solid #F0F2F5",alignItems:"center"}}>
+              <div style={{width:40,height:40,borderRadius:12,background:"linear-gradient(135deg,#2D4A1E,#556B2F)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{f.icon}</div>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:"#191F28",marginBottom:2}}>{f.title}</div>
+                <div style={{fontSize:11,color:"#6B7685"}}>{f.desc}</div>
               </div>
-              <span style={{fontSize:14,fontWeight:500,color:"#333D4B"}}>{step.text}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* CTA 버튼 */}
-      <div style={{padding:"28px 20px 52px"}}>
+      <div style={{padding:"20px 20px 40px"}}>
         <button
           onClick={signInWithKakao}
           style={{
-            width:"100%", padding:"17px",
-            borderRadius:16, background:"#FEE500",
-            color:"#191919", fontSize:17, fontWeight:800,
-            border:"none", cursor:"pointer",
+            width:"100%",padding:"16px",
+            borderRadius:16,background:"#FEE500",
+            color:"#191919",fontSize:16,fontWeight:800,
+            border:"none",cursor:"pointer",
             boxShadow:"0 4px 20px rgba(254,229,0,.4)",
-            display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+            display:"flex",alignItems:"center",justifyContent:"center",gap:10,
           }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="#191919"><path d="M12 3C6.48 3 2 6.92 2 11.76c0 3.06 1.87 5.75 4.71 7.3l-1.2 4.47 4.98-3.3A11.5 11.5 0 0012 20.52c5.52 0 10-3.92 10-8.76C22 6.92 17.52 3 12 3z"/></svg>
           카카오로 시작하기
         </button>
-        <div style={{textAlign:"center",fontSize:11,color:"#C0C8D4",marginTop:14,lineHeight:1.6}}>
+        <div style={{textAlign:"center",fontSize:11,color:"#C0C8D4",marginTop:12}}>
           로그인 시 서비스 이용약관 및 개인정보처리방침에 동의하게 됩니다
         </div>
       </div>
