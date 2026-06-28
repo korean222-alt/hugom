@@ -437,7 +437,7 @@ export default function App() {
       const { data: { user } } = await supabase.auth.getUser();
       const { data, error } = await supabase.from("users").insert({
         kakao_id: user.id,
-        role: profileData.userType,
+        role: profileData.userType === "gomshin" ? "gomshin" : "soldier",
         name: profileData.name,
         enlist_date: profileData.enlist,
         discharge_date: profileData.discharge,
@@ -447,12 +447,15 @@ export default function App() {
         perf_cycle_days: profileData.perf_cycle_days,
         annual_limits: profileData.annual_limits,
         reward_limit: profileData.reward_limit,
-        missed_months: profileData.missedMonths,
+        missed_months: profileData.userType === "gomshin" ? {이등병:0,일병:0,상병:0} : profileData.missedMonths,
         visit_out_cycle: profileData.visitOutCycle,
       }).select().single();
       if (!error && data) {
         setProfile({ ...profileData, id: data.id });
         setAuthState("ready");
+      } else {
+        console.error("가입 오류:", error);
+        alert("가입 오류: " + error?.message);
       }
     }}/>
   );
