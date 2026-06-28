@@ -85,6 +85,18 @@ function calcRankInfo(enlist, missedMonths, targetDate) {
   return { currentRank, hobon, promotions, nextRankKey };
 }
 
+
+const fmtWon = (n) => n ? n.toLocaleString() + "원" : "0원";
+const fmtMan = (n) => {
+  if (!n) return "0원";
+  if (n >= 10000) {
+    const man = Math.floor(n / 10000);
+    const rest = n % 10000;
+    return rest > 0 ? `${man}만 ${rest.toLocaleString()}원` : `${man}만원`;
+  }
+  return n.toLocaleString() + "원";
+};
+
 const toKey = (d) => {
   const dt = typeof d==="string"?new Date(d):d;
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
@@ -1490,7 +1502,7 @@ function SalaryCalc({rankInfo, profile}){
         </div>
         <div style={{background:"#F9FAFB",borderRadius:12,padding:"14px",marginBottom:20}}>
           <div style={{fontSize:12,color:"#8B95A1",marginBottom:4}}>예상 총 수령액 (월급+내일준비적금)</div>
-          <div style={{fontSize:20,fontWeight:900,color:"#191F28"}}>{Math.round(totalSavings).toLocaleString()}원</div>
+          <div style={{fontSize:20,fontWeight:900,color:"#191F28"}}>{fmtMan(Math.round(totalSavings))}</div>
         </div>
         <button style={{...S.btn,background:"#3182F6",color:"#fff"}} onClick={()=>setOpen(false)}>확인</button>
       </div>
