@@ -938,7 +938,7 @@ function CalendarTab({profile,leaves,schedules,perfDates,onAddLeave,onDelLeave,o
               {isPerf&&dayLeaves.length===0&&(isPerfStart?<div style={{fontSize:7,fontWeight:700,color:"#FF6B00",background:"#FFF2E8",borderRadius:3,padding:"1px 3px",display:"inline-block"}}>⭐{perfIdx+1}차</div>:<div style={{height:2,background:"#FBBF24",borderRadius:1,margin:"3px 2px 0",opacity:0.5}}/>)}
               <div style={{display:"flex",flexDirection:"column",gap:1.5,marginTop:1}}>
                 {dayLeaves.slice(0,2).map((l,i)=>{const lt=LEAVE_TYPES[l.leave_type];if(!lt)return null;return(<div key={i} style={{fontSize:7.5,fontWeight:700,borderRadius:4,padding:"2px 4px",background:lt.color,color:"#fff",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",display:"flex",alignItems:"center",gap:2}}><span>{lt.icon}</span><span>{lt.label}</span></div>);})}
-                	                {dayScheds.slice(0,2).map((s,i)=>{const et=EVENT_TYPES[s.event_type];if(!et)return null;return(<div key={i} style={{fontSize:7.5,fontWeight:700,borderRadius:4,padding:"2px 4px",background:et.bg,color:et.color,border:`1px solid ${et.border}`,overflow:"hidden",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:2}}><span>{et.icon}</span><span>{s.title || et.label}</span></div>);})}
+                	                {dayScheds.map((s,i)=>{const et=EVENT_TYPES[s.event_type];if(!et)return null;return(<div key={i} style={{fontSize:7.5,fontWeight:700,borderRadius:4,padding:"2px 4px",background:et.bg,color:et.color,border:`1px solid ${et.border}`,overflow:"hidden",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:2,marginTop:1}}><span>{et.icon}</span><span>{s.title || et.label}</span></div>);})}
 
               </div>
             </div>
@@ -1085,7 +1085,7 @@ function GomshinSuggestPanel({partnerName,onSend,onClose}){
   );
 }
 
-function MultiRangePicker({onClose,onDone}){
+function MultiRangePicker({onClose,onDone,leaves,profile}){
   const [activeLt,setActiveLt]=useState("annual");const [selections,setSelections]=useState({});const [hoverKey,setHoverKey]=useState(null);const [memo,setMemo]=useState("");
   const today=new Date();const [vy,setVy]=useState(today.getFullYear());const [vm,setVm]=useState(today.getMonth());
   const months=[{y:vy,m:vm},{y:vm===11?vy+1:vy,m:vm===11?0:vm+1}];
@@ -1100,6 +1100,24 @@ function MultiRangePicker({onClose,onDone}){
   const totalDays=confirmedEntries.reduce((acc,[,s])=>acc+diffDays(s.start,s.end)+1,0);
   const canSave=confirmedEntries.length>0;
   const handleSave=()=>{const arr=confirmedEntries.map(([lt,s])=>({leave_type:lt,start_date:s.start,end_date:s.end,memo:memo.trim()||null}));if(arr.length===0)return;onDone(arr);setMemo("");};
+
+  const rankInfo = useMemo(() => profile ? calcRankInfo(profile.enlist, profile.missedMonths) : null, [profile]);
+  const usedByType = useMemo(() => {
+    const map = {};
+    Object.keys(LEAVE_TYPES).forEach(lt => {
+      map[lt] = (leaves || [])
+        .filter(l => l.leave_type === lt)
+        .reduce((acc, l) => acc + diffDays(l.start_date, l.end_date) + 1, 0);
+    });
+    return map;
+  }, [leaves]);
+  const limitByType = {
+    annual: profile?.annual_limits?.[rankInfo?.currentRank] || null,
+    reward: profile?.reward_limit || null,
+    comfort: null,
+    perf: profile?.perf_cycle_days || null,
+    outing: null,
+  };
 
   const pendingDays = curSel.start && curSel.end ? diffDays(curSel.start, curSel.end) + 1 : 0;
   const used = usedByType[activeLt] || 0;
