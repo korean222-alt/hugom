@@ -938,7 +938,8 @@ function CalendarTab({profile,leaves,schedules,perfDates,onAddLeave,onDelLeave,o
               {isPerf&&dayLeaves.length===0&&(isPerfStart?<div style={{fontSize:7,fontWeight:700,color:"#FF6B00",background:"#FFF2E8",borderRadius:3,padding:"1px 3px",display:"inline-block"}}>⭐{perfIdx+1}차</div>:<div style={{height:2,background:"#FBBF24",borderRadius:1,margin:"3px 2px 0",opacity:0.5}}/>)}
               <div style={{display:"flex",flexDirection:"column",gap:1.5,marginTop:1}}>
                 {dayLeaves.slice(0,2).map((l,i)=>{const lt=LEAVE_TYPES[l.leave_type];if(!lt)return null;return(<div key={i} style={{fontSize:7.5,fontWeight:700,borderRadius:4,padding:"2px 4px",background:lt.color,color:"#fff",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",display:"flex",alignItems:"center",gap:2}}><span>{lt.icon}</span><span>{lt.label}</span></div>);})}
-                {dayScheds.slice(0,1).map((s,i)=>{const et=EVENT_TYPES[s.event_type];if(!et)return null;return(<div key={i} style={{fontSize:7.5,fontWeight:700,borderRadius:4,padding:"2px 4px",background:et.bg,color:et.color,border:`1px solid ${et.border}`,overflow:"hidden",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:2}}><span>{et.icon}</span><span>{s.title || et.label}</span></div>);})}
+                	                {dayScheds.slice(0,2).map((s,i)=>{const et=EVENT_TYPES[s.event_type];if(!et)return null;return(<div key={i} style={{fontSize:7.5,fontWeight:700,borderRadius:4,padding:"2px 4px",background:et.bg,color:et.color,border:`1px solid ${et.border}`,overflow:"hidden",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:2}}><span>{et.icon}</span><span>{s.title || et.label}</span></div>);})}
+
               </div>
             </div>
           );
@@ -1099,6 +1100,13 @@ function MultiRangePicker({onClose,onDone}){
   const totalDays=confirmedEntries.reduce((acc,[,s])=>acc+diffDays(s.start,s.end)+1,0);
   const canSave=confirmedEntries.length>0;
   const handleSave=()=>{const arr=confirmedEntries.map(([lt,s])=>({leave_type:lt,start_date:s.start,end_date:s.end,memo:memo.trim()||null}));if(arr.length===0)return;onDone(arr);setMemo("");};
+
+  const pendingDays = curSel.start && curSel.end ? diffDays(curSel.start, curSel.end) + 1 : 0;
+  const used = usedByType[activeLt] || 0;
+  const limit = limitByType[activeLt];
+  const afterPending = used + pendingDays;
+  const isOver = limit && afterPending > limit;
+
   return(
     <div style={{position:"fixed",inset:0,background:"#fff",zIndex:200,display:"flex",flexDirection:"column"}}>
       <div style={{background:`linear-gradient(135deg,${cfg.color}cc,${cfg.color})`,padding:"14px 20px 10px",flexShrink:0}}>
@@ -1108,12 +1116,49 @@ function MultiRangePicker({onClose,onDone}){
           <button onClick={handleSave} disabled={!canSave} style={{fontSize:13,fontWeight:700,padding:"6px 14px",borderRadius:8,border:"none",cursor:canSave?"pointer":"default",background:canSave?"#fff":"rgba(255,255,255,.2)",color:canSave?cfg.color:"rgba(255,255,255,.4)"}}>완료 {canSave?`(${totalDays}일)`:""}</button>
         </div>
         <div style={{display:"flex",gap:5,overflowX:"auto",marginBottom:8,paddingBottom:2}}>
-          {Object.entries(LEAVE_TYPES).map(([k,v])=>{const sel=selections[k];const hasRange=sel&&sel.start&&sel.end;const isActive=activeLt===k;return(<button key={k} onClick={()=>setActiveLt(k)} style={{flexShrink:0,padding:"5px 11px",borderRadius:100,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",background:isActive?"rgba(255,255,255,.95)":hasRange?"rgba(255,255,255,.35)":"rgba(255,255,255,.18)",color:isActive?cfg.color:hasRange?"#fff":"rgba(255,255,255,.75)",position:"relative"}}>{v.icon} {v.label}{hasRange&&<span style={{position:"absolute",top:-3,right:-3,width:10,height:10,borderRadius:"50%",background:"#FFD700",border:"1.5px solid rgba(255,255,255,.6)"}}/>}</button>);})}
+          {Object.entries(LEAVE_TYPES).map(([k,v])=>{
+            const sel=selections[k];const hasRange=sel&&sel.start&&sel.end;const isActive=activeLt===k;
+            const u = usedByType[k] || 0;
+            const l = limitByType[k];
+            const rem = l ? l - u : null;
+            const o = rem !== null && rem < 0;
+            return(<button key={k} onClick={()=>setActiveLt(k)} style={{flexShrink:0,padding:"5px 11px",borderRadius:100,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",background:isActive?"rgba(255,255,255,.95)":hasRange?"rgba(255,255,255,.35)":"rgba(255,255,255,.18)",color:isActive?cfg.color:hasRange?"#fff":"rgba(255,255,255,.75)",position:"relative",display:"flex",alignItems:"center",gap:4}}>
+              {v.icon} {v.label}
+              {rem !== null && (
+                <span style={{
+                  fontSize: 9,
+                  fontWeight: 800,
+                  color: o ? "#F04452" : isActive ? cfg.color : "#fff",
+                  background: o ? "rgba(240,68,82,.15)" : isActive ? "rgba(0,0,0,.05)" : "rgba(255,255,255,.2)",
+                  borderRadius: 100,
+                  padding: "1px 5px",
+                }}>
+                  {o ? `+${Math.abs(rem)}` : `${rem}일`}
+                </span>
+              )}
+              {hasRange&&<span style={{position:"absolute",top:-3,right:-3,width:10,height:10,borderRadius:"50%",background:"#FFD700",border:"1.5px solid rgba(255,255,255,.6)"}}/>}
+            </button>);
+          })}
         </div>
-        <div style={{display:"flex",alignItems:"center",background:"rgba(255,255,255,.15)",borderRadius:12,padding:"8px 14px"}}>
-          <div style={{fontSize:15,marginRight:8}}>{cfg.icon}</div>
-          <div style={{flex:1}}><div style={{fontSize:10,color:"rgba(255,255,255,.65)",fontWeight:600,marginBottom:2}}>{cfg.label}</div><div style={{fontSize:14,fontWeight:700,color:"#fff"}}>{curSel.start&&curSel.end?`${curSel.start.slice(5).replace("-","/")} ~ ${curSel.end.slice(5).replace("-","/")} (${diffDays(curSel.start,curSel.end)+1}일)`:curSel.start?"종료일 선택":"시작일을 선택하세요"}</div></div>
-          {curSel.start&&curSel.end&&<button onClick={()=>removeType(activeLt)} style={{fontSize:12,color:"rgba(255,255,255,.7)",background:"rgba(255,255,255,.15)",border:"none",borderRadius:6,padding:"4px 8px",cursor:"pointer",fontWeight:600}}>지우기</button>}
+        <div style={{display:"flex",flexDirection:"column",background:"rgba(255,255,255,.15)",borderRadius:12,padding:"10px 14px"}}>
+          <div style={{display:"flex",alignItems:"center"}}>
+            <div style={{fontSize:15,marginRight:8}}>{cfg.icon}</div>
+            <div style={{flex:1}}><div style={{fontSize:10,color:"rgba(255,255,255,.65)",fontWeight:600,marginBottom:2}}>{cfg.label}</div><div style={{fontSize:14,fontWeight:700,color:"#fff"}}>{curSel.start&&curSel.end?`${curSel.start.slice(5).replace("-","/")} ~ ${curSel.end.slice(5).replace("-","/")} (${diffDays(curSel.start,curSel.end)+1}일)`:curSel.start?"종료일 선택":"시작일을 선택하세요"}</div></div>
+            {curSel.start&&curSel.end&&<button onClick={()=>removeType(activeLt)} style={{fontSize:12,color:"rgba(255,255,255,.7)",background:"rgba(255,255,255,.15)",border:"none",borderRadius:6,padding:"4px 8px",cursor:"pointer",fontWeight:600}}>지우기</button>}
+          </div>
+          {limit && (
+            <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,.1)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"rgba(255,255,255,.8)",fontWeight:600,marginBottom:4}}>
+                <span>{cfg.label} 현황 (한도 {limit}일)</span>
+                <span style={{color:isOver?"#FFD0D0":"#fff"}}>
+                  {used}일 사용{pendingDays>0?` + 선택 ${pendingDays}일`:""} {isOver?`⚠️ ${afterPending-limit}일 초과`:`→ ${limit-afterPending}일 남음`}
+                </span>
+              </div>
+              <div style={{height:3,background:"rgba(255,255,255,.2)",borderRadius:2,marginTop:4}}>
+                <div style={{height:"100%",borderRadius:2,width:`${Math.min(100,(afterPending/limit)*100)}%`,background:isOver?"#FFD0D0":"#fff"}}/>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 16px",background:"#F9FAFB",borderBottom:"1px solid #E8ECF0",flexShrink:0}}>
