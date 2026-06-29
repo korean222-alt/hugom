@@ -675,7 +675,7 @@ export default function App() {
         const { data, error } = await supabase
           .from("users")
           .select("*")
-          .or(`kakao_id.eq.${user.id},id.eq.${user.id}`) // id(UUID) 또는 kakao_id(기존 저장된 UID) 둘 다 확인
+          .or(`id.eq.${user.id},kakao_id.eq.${user.id}`)
           .single();
 
         if (data && !error) {
@@ -791,9 +791,9 @@ export default function App() {
         event: "INSERT",
         schema: "public",
         table: "notifications",
+        filter: `user_id=eq.${profile.id}`,
       }, (payload) => {
         const n = payload.new;
-        if (n.user_id !== profile.id) return; // 내 알림만 처리
         let msg = n.message;
         try { if (typeof msg === "string") msg = JSON.parse(msg); } catch(e) {}
         setNotifs(prev => [{
