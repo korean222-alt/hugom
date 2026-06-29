@@ -1305,7 +1305,7 @@ function Onboarding({onComplete}){
       <style>{`*{box-sizing:border-box;margin:0;padding:0;}button:active{transform:scale(0.95)!important;}::-webkit-scrollbar{display:none;}@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}.su{animation:slideUp .25s cubic-bezier(.34,1.2,.64,1);}`}</style>
       <div style={{paddingTop:52,paddingBottom:28}}>
         <button onClick={()=>{setUserType(null);setErr("");}} style={{fontSize:13,color:"#8B95A1",background:"none",border:"none",cursor:"pointer",marginBottom:20}}>← 유형 선택</button>
-        <div style={{fontSize:22,fontWeight:800,color:"#191F28",marginBottom:4}}>{userType==="gomshin"?"기다리는 사람 정보":"기본 정보 입력"}</div>
+        <div style={{fontSize:22,fontWeight:800,color:"#191F28",marginBottom:4}}>{userType==="gomshin"?"곰신 정보":"기본 정보 입력"}</div>
         <div style={{fontSize:13,color:"#8B95A1"}}>나머지 세부 설정은 앱 안에서 언제든 할 수 있어요</div>
       </div>
       <div className="su" style={{display:"flex",flexDirection:"column",gap:16}}>
