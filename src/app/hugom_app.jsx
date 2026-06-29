@@ -21,6 +21,7 @@ const EVENT_TYPES = {
   visit_in:    { label:"영내면회", icon:"🏠", color:"#3182F6", bg:"#EBF3FF", border:"#A5C9FF" },
   visit_out:   { label:"면회외출", icon:"🚗", color:"#7C3AED", bg:"#F3EEFF", border:"#C9B2F8" },
   weekend_out: { label:"주말외출", icon:"☀️", color:"#FF9500", bg:"#FFF8E8", border:"#FFDB9A" },
+  other:       { label:"직접추가", icon:"📝", color:"#4E5968", bg:"#F2F4F6", border:"#D1D6DB" },
 };
 const HOLIDAYS = {
   "2026-01-01":"신정","2026-01-28":"설날연휴","2026-01-29":"설날","2026-01-30":"설날연휴",
@@ -981,7 +982,16 @@ function EventModal({dateKey,leaves,schedules,profile,onAddLeave,onDelLeave,onAd
       return;
     }
     if(evType==="visit_out"&&!confirmOverride){const warn=checkVisitOutCycle();if(warn){setVisitOutWarn(warn);return;}}
-    onAddSched({event_type:evType,event_date:dateKey,memo:memo.trim()||null});setMemo("");onClose();
+    // '직접추가'인 경우 메모를 제목으로 사용, 아니면 일반 메모로 사용
+    const isOther = evType === "other";
+    onAddSched({
+      event_type: evType,
+      event_date: dateKey,
+      memo: isOther ? null : (memo.trim() || null),
+      title: isOther ? (memo.trim() || "직접추가") : null
+    });
+    setMemo("");
+    onClose();
   };
   const evColor=EVENT_TYPES[evType]?.color||"#3182F6";
   return(
@@ -996,7 +1006,7 @@ function EventModal({dateKey,leaves,schedules,profile,onAddLeave,onDelLeave,onAd
           <div><div style={{fontSize:16,fontWeight:800}}>{dateKey.slice(0,7).replace("-","년 ")}월 {Number(dateKey.split("-")[2])}일</div>{hol&&<div style={{fontSize:12,color:"#F04452",fontWeight:600,marginTop:2}}>🔴 {hol}</div>}</div>
         </div>
         {dayLeaves.length>0&&<><div style={S.sectionTitle}>등록된 휴가</div>{dayLeaves.map(l=>{const lt=LEAVE_TYPES[l.leave_type];if(!lt)return null;return(<div key={l.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,background:lt.bg,border:`1px solid ${lt.border}`,marginBottom:6}}><span style={{fontSize:18}}>{lt.icon}</span><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:lt.color}}>{lt.label}</div><div style={{fontSize:11,color:"#8B95A1"}}>{l.start_date} ~ {l.end_date}</div></div><button onClick={()=>onDelLeave(l.id)} style={{fontSize:12,color:"#F04452",fontWeight:700,padding:"4px 8px",background:"rgba(240,68,82,.08)",borderRadius:6,border:"none",cursor:"pointer"}}>삭제</button></div>);})}</>}
-        {dayScheds.length>0&&<><div style={{...S.sectionTitle,marginTop:14}}>등록된 일정</div>{dayScheds.map(s=>{const et=EVENT_TYPES[s.event_type];if(!et)return null;return(<div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,background:et.bg,border:`1px solid ${et.border}`,marginBottom:6}}><span style={{fontSize:18}}>{et.icon}</span><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:et.color}}>{et.label}</div>{s.memo&&<div style={{fontSize:11,color:"#8B95A1"}}>{s.memo}</div>}</div><button onClick={()=>onDelSched(s.id)} style={{fontSize:12,color:"#F04452",fontWeight:700,padding:"4px 8px",background:"rgba(240,68,82,.08)",borderRadius:6,border:"none",cursor:"pointer"}}>삭제</button></div>);})}</>}
+        {dayScheds.length>0&&<><div style={{...S.sectionTitle,marginTop:14}}>등록된 일정</div>{dayScheds.map(s=>{const et=EVENT_TYPES[s.event_type];if(!et)return null;return(<div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,background:et.bg,border:`1px solid ${et.border}`,marginBottom:6}}><span style={{fontSize:18}}>{et.icon}</span><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:et.color}}>{s.title || et.label}</div>{(s.memo || (s.title && et.label !== "직접추가")) && <div style={{fontSize:11,color:"#8B95A1"}}>{s.memo}</div>}</div><button onClick={()=>onDelSched(s.id)} style={{fontSize:12,color:"#F04452",fontWeight:700,padding:"4px 8px",background:"rgba(240,68,82,.08)",borderRadius:6,border:"none",cursor:"pointer"}}>삭제</button></div>);})}</>}
         <div style={{fontSize:10,color:"#F04452",fontWeight:600,marginBottom:8,lineHeight:1.4}}>⚠️ 군사보안 위반 관련 글 작성 시 법적 책임은 본인에게 있습니다</div>
         <div style={{...S.sectionTitle,marginTop:16}}>일정 추가</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12}}>
@@ -1009,7 +1019,7 @@ function EventModal({dateKey,leaves,schedules,profile,onAddLeave,onDelLeave,onAd
             <div style={{display:"flex",gap:8}}><button onClick={onClose} style={{flex:1,padding:"10px",borderRadius:10,border:"1.5px solid #E8ECF0",background:"#fff",fontSize:13,fontWeight:700,color:"#4E5968",cursor:"pointer"}}>취소</button><button onClick={()=>setConfirmOverride(true)} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:"#FF9800",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>그래도 등록</button></div>
           </div>
         )}
-        <input style={{...S.input,marginBottom:12}} value={memo} onChange={e=>setMemo(e.target.value)} placeholder="메모 (선택사항)"/>
+        <input style={{...S.input,marginBottom:12}} value={memo} onChange={e=>setMemo(e.target.value)} placeholder={evType==="other"?"일정 제목을 입력하세요":"메모 (선택사항)"}/>
         <button style={{...S.btn,background:evColor,color:"#fff",boxShadow:`0 4px 14px ${evColor}55`}} onClick={handleRegister}>
           {EVENT_TYPES[evType]?.icon} {EVENT_TYPES[evType]?.label} 등록{evType==="visit_out"&&visitOutWarn&&confirmOverride?" (텀 무시)":""}
         </button>
