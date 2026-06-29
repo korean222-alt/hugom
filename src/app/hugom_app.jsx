@@ -230,6 +230,26 @@ function LandingPage() {
       </div>
 
       <div style={{padding:"20px 20px 40px"}}>
+        {/* 베타 배지 */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:14,padding:"10px 16px",background:"#F9FAFB",borderRadius:14,border:"1px solid #E8ECF0"}}>
+          <div style={{padding:"3px 10px",borderRadius:100,background:"linear-gradient(135deg,#556B2F,#3D5A1E)",color:"#fff",fontSize:11,fontWeight:900,letterSpacing:"0.05em"}}>β BETA</div>
+          <span style={{fontSize:12,color:"#6B7685",fontWeight:600}}>현재 베타 테스트 기간 · 무료 이용 가능</span>
+        </div>
+
+        {/* 앱스토어 출시 예정 */}
+        <div style={{display:"flex",gap:8,marginBottom:16}}>
+          {[{icon:"🍎",store:"App Store",sub:"iOS 출시 예정"},{icon:"🤖",store:"Google Play",sub:"Android 출시 예정"}].map(s=>(
+            <div key={s.store} style={{flex:1,display:"flex",alignItems:"center",gap:8,padding:"10px 12px",borderRadius:14,background:"#F9FAFB",border:"1px solid #E8ECF0"}}>
+              <span style={{fontSize:20}}>{s.icon}</span>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:11,fontWeight:800,color:"#191F28"}}>{s.store}</div>
+                <div style={{fontSize:10,color:"#8B95A1",marginTop:1}}>{s.sub}</div>
+              </div>
+              <div style={{marginLeft:"auto",flexShrink:0,padding:"3px 7px",borderRadius:100,background:"#E8ECF0",fontSize:9,fontWeight:700,color:"#8B95A1"}}>준비중</div>
+            </div>
+          ))}
+        </div>
+
         <button
           onClick={signInWithKakao}
           style={{
@@ -733,12 +753,12 @@ export default function App() {
     <div style={S.wrap}>
       <style>{`*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}button:active{transform:scale(0.95)!important;transition:transform 0.08s;}::-webkit-scrollbar{display:none;}@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}.su{animation:slideUp .25s cubic-bezier(.34,1.2,.64,1);}.fi{animation:fadeIn .18s ease;}.shake{animation:shake .4s ease;}`}</style>
       <header style={S.header}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          {viewingFriend&&<button onClick={()=>setViewingFriendId(null)} style={{background:"#F2F4F6",border:"none",borderRadius:8,padding:"6px 8px",fontSize:11,fontWeight:600,color:"#4E5968",cursor:"pointer",whiteSpace:"nowrap"}}>← 내 달력</button>}
-          <div style={{fontSize:15,fontWeight:800,color:"#191F28",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0,flex:1,overflow:"hidden"}}>
+          {viewingFriend&&<button onClick={()=>setViewingFriendId(null)} style={{background:"#F2F4F6",border:"none",borderRadius:8,padding:"5px 8px",fontSize:10,fontWeight:600,color:"#4E5968",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>← 내 달력</button>}
+          <div style={{fontSize:13,fontWeight:800,color:"#191F28",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>
             {isGomshin?"🐻 휴곰 — 곰신":"🐻 휴곰 — 군화"}
-            {viewingFriend&&<span style={{fontSize:12,color:"#8B95A1",fontWeight:500,marginLeft:4}}>{viewingFriend.name}</span>}
-            {linkedSoldier&&!viewingFriend&&tab==="cal"&&<span style={{fontSize:11,color:"#8B95A1",fontWeight:500,marginLeft:4}}>{linkedSoldier.name}</span>}
+            {viewingFriend&&<span style={{fontSize:11,color:"#8B95A1",fontWeight:500,marginLeft:4}}>· {viewingFriend.name}</span>}
+            {linkedSoldier&&!viewingFriend&&tab==="cal"&&<span style={{fontSize:11,color:"#8B95A1",fontWeight:500,marginLeft:4}}>· {linkedSoldier.name}</span>}
           </div>
         </div>
         <button onClick={()=>setShowNotif(true)} style={{position:"relative",background:"none",border:"none",padding:4,cursor:"pointer"}}>
@@ -1576,7 +1596,10 @@ function ProfileTab({profile,setProfile,leaves,onReset,setAuthState,setLeaves,se
         </button>
       </div>
 
-      <div style={{textAlign:"center",fontSize:11,color:"#D1D6DB"}}>휴곰 v1.3 · {isGomshin?"곰신 모드":"군화 모드"}</div>
+      {/* 개발자에게 피드백 */}
+      <FeedbackForm userProfile={profile}/>
+
+      <div style={{textAlign:"center",fontSize:11,color:"#D1D6DB"}}>휴곰 v1.4 · {isGomshin?"곰신 모드":"군화 모드"}</div>
 
       {showRankEdit&&(
         <div className="fi" style={S.overlay} onClick={()=>setShowRankEdit(false)}>
@@ -1739,44 +1762,124 @@ function ServiceTimeline({profile,rankInfo,leaves}){
     </div>
   );
 }
+function FeedbackForm({ userProfile }) {
+  const [feedType, setFeedType] = useState("bug");
+  const [msg, setMsg] = useState("");
+  const [done, setDone] = useState(false);
+
+  const TYPE_OPTS = [
+    { id:"bug",   icon:"🐛", label:"버그 신고" },
+    { id:"feat",  icon:"✨", label:"기능 제안" },
+    { id:"etc",   icon:"💬", label:"기타 문의" },
+  ];
+
+  const handleSend = () => {
+    if (msg.trim().length < 10) {
+      alert("내용을 10자 이상 입력해주세요");
+      return;
+    }
+    const type = TYPE_OPTS.find(t=>t.id===feedType);
+    const subject = encodeURIComponent(`[휴곰 ${type.icon}${type.label}] ${userProfile?.name||"사용자"}`);
+    const body = encodeURIComponent(
+`유형: ${type.icon} ${type.label}
+사용자: ${userProfile?.name||"미상"} (${userProfile?.userType==="gomshin"?"곰신":"군화"})
+날짜: ${new Date().toLocaleString("ko-KR")}
+
+─────────────────
+${msg.trim()}
+─────────────────
+`
+    );
+    window.location.href = `mailto:gnsdl2309@naver.com?subject=${subject}&body=${body}`;
+    setDone(true);
+    setMsg("");
+  };
+
+  if (done) return (
+    <div style={{...S.card,border:"1px solid #B7F0D5",background:"#E8FBF3"}}>
+      <div style={{textAlign:"center",padding:"12px 0"}}>
+        <div style={{fontSize:28,marginBottom:6}}>🐻</div>
+        <div style={{fontSize:14,fontWeight:800,color:"#05C072"}}>메일 앱이 열렸어요!</div>
+        <div style={{fontSize:12,color:"#8B95A1",marginTop:4,lineHeight:1.6}}>전송 버튼을 눌러 완료해주세요.<br/>소중한 의견 감사해요 💚</div>
+        <button onClick={()=>setDone(false)} style={{marginTop:10,padding:"8px 20px",borderRadius:100,background:"#05C072",color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer"}}>또 보내기</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{...S.card,border:"1px solid #E8ECF0"}}>
+      <div style={{fontSize:14,fontWeight:700,marginBottom:4}}>💌 개발자에게 피드백 보내기</div>
+      <div style={{fontSize:12,color:"#8B95A1",lineHeight:1.6,marginBottom:12}}>
+        버그 발견, 추가됐으면 하는 기능이 있으신가요?<br/>
+        의견을 보내주시면 적극 반영할게요 🐻
+      </div>
+
+      {/* 유형 선택 */}
+      <div style={{display:"flex",gap:6,marginBottom:12}}>
+        {TYPE_OPTS.map(t=>(
+          <button key={t.id} onClick={()=>setFeedType(t.id)} style={{flex:1,padding:"8px 4px",borderRadius:10,border:`1.5px solid ${feedType===t.id?"#3182F6":"#E8ECF0"}`,background:feedType===t.id?"#EBF3FF":"#F9FAFB",fontSize:12,fontWeight:700,color:feedType===t.id?"#3182F6":"#8B95A1",cursor:"pointer"}}>
+            {t.icon}<br/><span style={{fontSize:10}}>{t.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* 내용 입력 */}
+      <textarea
+        value={msg}
+        onChange={e=>setMsg(e.target.value)}
+        placeholder="자세히 알려주실수록 빠르게 반영할 수 있어요! (10자 이상)"
+        style={{...S.input,height:100,resize:"none",fontSize:13,lineHeight:1.6,marginBottom:12,fontFamily:"inherit"}}
+      />
+
+      <button onClick={handleSend} style={{...S.btn,background:"linear-gradient(135deg,#2D4A1E,#556B2F)",color:"#fff",boxShadow:"0 4px 14px rgba(61,90,30,.25)"}}>
+        📬 메일로 보내기 (gnsdl2309@naver.com)
+      </button>
+    </div>
+  );
+}
+
 function SalaryCalc({rankInfo, profile}){
   const [open, setOpen] = useState(false);
-  const [showPayEdit, setShowPayEdit] = useState(false);
-  const [customPay, setCustomPay] = useState({
-    이등병: SOLDIER_PAY['이등병'],
-    일병: SOLDIER_PAY['일병'],
-    상병: SOLDIER_PAY['상병'],
-    병장: SOLDIER_PAY['병장']
-  });
-  
-  // 프로필의 missedMonths를 반영한 실제 복무 기간 계산
+  const [activeTab, setActiveTab] = useState("duration"); // "duration" | "salary"
+
+  // 실제 복무 기간 (missedMonths 반영)
   const actualDurations = useMemo(() => {
     const { dur } = calcRankSchedule(profile.enlist, profile.missedMonths);
-    // 병장은 전역일 - 마지막 진급일로 계산
     const lastPromotion = Object.values(calcRankSchedule(profile.enlist, profile.missedMonths).promotions).pop();
-    const sergeantDur = Math.ceil(diffDays(lastPromotion, profile.discharge) / 30);
+    const sergeantDur = Math.max(1, Math.ceil(diffDays(lastPromotion, profile.discharge) / 30));
     return { ...dur, 병장: sergeantDur };
   }, [profile.enlist, profile.missedMonths, profile.discharge]);
 
   const [durations, setDurations] = useState(actualDurations);
-  
-  // durations가 props(profile) 변경 시 업데이트되도록 보정
-  useEffect(() => {
-    setDurations(actualDurations);
-  }, [actualDurations]);
+  const [customPay, setCustomPay] = useState({...SOLDIER_PAY});
+  // 조기/누락 직접 설정 (개월 단위, 음수=조기, 양수=누락)
+  const [manualAdj, setManualAdj] = useState({이등병:0,일병:0,상병:0});
+  const [useManual, setUseManual] = useState(false);
+
+  useEffect(() => { setDurations(actualDurations); }, [actualDurations]);
+
+  // manualAdj 적용 시 복무기간 재계산
+  const adjustedDurations = useMemo(() => {
+    if (!useManual) return durations;
+    const adj = {...durations};
+    ["이등병","일병","상병"].forEach(r => {
+      adj[r] = Math.max(1, (durations[r] || 0) + (manualAdj[r] || 0));
+    });
+    // 병장은 전체에서 앞 3계급 합산 후 나머지
+    const totalMonths = Object.values(durations).reduce((a,b)=>a+b,0);
+    const beforeSergeant = (adj["이등병"]||0)+(adj["일병"]||0)+(adj["상병"]||0);
+    adj["병장"] = Math.max(1, totalMonths - beforeSergeant);
+    return adj;
+  }, [durations, manualAdj, useManual]);
 
   const totalSalary = useMemo(() => {
     let total = 0;
-    RANK_LABELS.forEach(r => {
-      total += (customPay[r] || 0) * (durations[r] || 0);
-    });
+    RANK_LABELS.forEach(r => { total += (customPay[r]||0) * (adjustedDurations[r]||0); });
     return total;
-  }, [durations, customPay]);
+  }, [adjustedDurations, customPay]);
 
-  const totalSavings = useMemo(() => {
-    const months = Object.values(durations).reduce((a, b) => a + b, 0);
-    return (totalSalary + (NAEILJUN_MAX * months)) * 1.05;
-  }, [totalSalary, durations]);
+  const totalMonths = useMemo(() => Object.values(adjustedDurations).reduce((a,b)=>a+b,0), [adjustedDurations]);
+  const totalSavings = useMemo(() => (totalSalary + NAEILJUN_MAX * totalMonths) * 1.05, [totalSalary, totalMonths]);
 
   if (!open) return (
     <div style={S.card}>
@@ -1784,8 +1887,9 @@ function SalaryCalc({rankInfo, profile}){
         <div>
           <div style={{fontSize:14,fontWeight:700}}>💰 예상 전역 적금</div>
           <div style={{fontSize:18,fontWeight:900,color:"#3182F6",marginTop:4}}>약 {Math.round(totalSavings/10000).toLocaleString()}만원</div>
+          <div style={{fontSize:11,color:"#8B95A1",marginTop:2}}>월급 {fmtMan(totalSalary)} + 내일준비적금</div>
         </div>
-        <button onClick={()=>setOpen(true)} style={{fontSize:12,color:"#3182F6",fontWeight:700,background:"#EBF3FF",border:"none",borderRadius:8,padding:"8px 12px",cursor:"pointer"}}>기간 설정</button>
+        <button onClick={()=>setOpen(true)} style={{fontSize:12,color:"#3182F6",fontWeight:700,background:"#EBF3FF",border:"none",borderRadius:8,padding:"8px 12px",cursor:"pointer"}}>상세 설정</button>
       </div>
     </div>
   );
@@ -1794,50 +1898,101 @@ function SalaryCalc({rankInfo, profile}){
     <div className="fi" style={S.overlay} onClick={()=>setOpen(false)}>
       <div className="su" style={S.sheet} onClick={e=>e.stopPropagation()}>
         <div style={S.handle}/>
-        <div style={{fontSize:16,fontWeight:800,marginBottom:18}}>계급별 복무 기간 및 월급 설정</div>
-        <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:20}}>
-          {RANK_LABELS.map(r => (
-            <div key={r} style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <span style={{fontSize:14,fontWeight:600,color:"#4E5968"}}>{r}</span>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <input 
-                  type="number" 
-                  value={durations[r]} 
-                  onChange={e => setDurations(prev => ({...prev, [r]: parseInt(e.target.value) || 0}))}
-                  style={{...S.input, width:60, textAlign:"center", padding:"8px"}}
-                />
-                <span style={{fontSize:13,color:"#8B95A1"}}>개월</span>
-              </div>
-            </div>
+        <div style={{fontSize:16,fontWeight:800,marginBottom:16}}>💰 전역 적금 계산기</div>
+
+        {/* 탭 */}
+        <div style={{display:"flex",gap:6,marginBottom:16,background:"#F2F4F6",borderRadius:12,padding:4}}>
+          {[{id:"duration",label:"📅 복무기간"},{id:"salary",label:"💵 월급 설정"}].map(t=>(
+            <button key={t.id} onClick={()=>setActiveTab(t.id)} style={{flex:1,padding:"8px",borderRadius:9,border:"none",fontSize:13,fontWeight:700,cursor:"pointer",background:activeTab===t.id?"#fff":"transparent",color:activeTab===t.id?"#191F28":"#8B95A1",boxShadow:activeTab===t.id?"0 1px 4px rgba(0,0,0,.08)":"none"}}>
+              {t.label}
+            </button>
           ))}
         </div>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#191F28"}}>월급</div>
-          <button onClick={()=>setShowPayEdit(!showPayEdit)} style={{fontSize:11,color:"#3182F6",background:"#EBF3FF",border:"none",borderRadius:6,padding:"4px 8px",cursor:"pointer",fontWeight:600}}>
-            {showPayEdit?"접기":"수정"}
-          </button>
-        </div>
-        {showPayEdit&&(
-          <div style={{background:"#FFF8E8",borderRadius:12,padding:"12px 14px",marginBottom:14,border:"1px solid #FFDB9A"}}>
-            {RANK_LABELS.map(r=>(
-              <div key={r} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                <span style={{fontSize:12,fontWeight:600,color:"#4E5968",width:40}}>{r}</span>
-                <input 
-                  type="number" 
-                  value={customPay[r]} 
-                  onChange={e=>setCustomPay(p=>({...p,[r]:parseInt(e.target.value)||0}))}
-                  style={{...S.input,flex:1,height:32,padding:"4px 8px",fontSize:12}}
-                />
-                <span style={{fontSize:11,color:"#8B95A1",width:20}}>원</span>
+
+        {activeTab==="duration"&&(
+          <div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#191F28"}}>계급별 복무 기간</div>
+              <button onClick={()=>setUseManual(v=>!v)} style={{fontSize:11,fontWeight:700,padding:"5px 10px",borderRadius:8,border:`1.5px solid ${useManual?"#3182F6":"#E8ECF0"}`,background:useManual?"#EBF3FF":"#F9FAFB",color:useManual?"#3182F6":"#8B95A1",cursor:"pointer"}}>
+                {useManual?"✓ 직접 조정 중":"진급 직접 조정"}
+              </button>
+            </div>
+
+            {/* 기본 복무기간 */}
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:useManual?12:0}}>
+              {RANK_LABELS.map(r=>(
+                <div key={r} style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:44,height:28,borderRadius:8,background:rankInfo?.currentRank===r?"#3182F6":"#E8ECF0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <span style={{fontSize:11,fontWeight:700,color:rankInfo?.currentRank===r?"#fff":"#8B95A1"}}>{r}</span>
+                  </div>
+                  <input type="number" value={adjustedDurations[r]||0}
+                    onChange={e=>{
+                      if(useManual){
+                        const newVal=parseInt(e.target.value)||0;
+                        setManualAdj(p=>({...p,[r]:newVal-(durations[r]||0)}));
+                      } else {
+                        setDurations(p=>({...p,[r]:parseInt(e.target.value)||0}));
+                      }
+                    }}
+                    style={{...S.input,flex:1,height:36,padding:"6px 10px",fontSize:14,textAlign:"center"}}/>
+                  <span style={{fontSize:13,color:"#8B95A1",flexShrink:0}}>개월</span>
+                  {useManual&&manualAdj[r]!==undefined&&manualAdj[r]!==0&&(
+                    <span style={{fontSize:11,fontWeight:700,color:manualAdj[r]<0?"#05C072":"#F04452",flexShrink:0}}>
+                      {manualAdj[r]>0?`+${manualAdj[r]}`:manualAdj[r]}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {useManual&&(
+              <div style={{background:"#EBF3FF",borderRadius:12,padding:"10px 14px",marginBottom:8,border:"1px solid #A5C9FF"}}>
+                <div style={{fontSize:11,color:"#3182F6",fontWeight:700,marginBottom:4}}>💡 조정 방법</div>
+                <div style={{fontSize:11,color:"#4E5968",lineHeight:1.6}}>개월 수를 직접 입력하세요.<br/>조기진급 → 숫자 줄이기 · 진급누락 → 숫자 늘리기</div>
               </div>
-            ))}
+            )}
+
+            <div style={{marginTop:10,padding:"10px 12px",background:"#F9FAFB",borderRadius:10,border:"1px solid #E8ECF0",fontSize:12,color:"#8B95A1",display:"flex",justifyContent:"space-between"}}>
+              <span>총 복무 기간</span>
+              <span style={{fontWeight:700,color:"#191F28"}}>{totalMonths}개월</span>
+            </div>
           </div>
         )}
-        <div style={{background:"#F9FAFB",borderRadius:12,padding:"14px",marginBottom:20}}>
-          <div style={{fontSize:12,color:"#8B95A1",marginBottom:4}}>예상 총 수령액 (월급+내일준비적금)</div>
-          <div style={{fontSize:20,fontWeight:900,color:"#191F28"}}>{fmtMan(Math.round(totalSavings))}</div>
+
+        {activeTab==="salary"&&(
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"#191F28",marginBottom:4}}>계급별 월급</div>
+            <div style={{fontSize:11,color:"#8B95A1",marginBottom:12}}>인상 시 직접 수정할 수 있어요</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {RANK_LABELS.map(r=>(
+                <div key={r} style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:44,height:28,borderRadius:8,background:rankInfo?.currentRank===r?"#3182F6":"#E8ECF0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <span style={{fontSize:11,fontWeight:700,color:rankInfo?.currentRank===r?"#fff":"#8B95A1"}}>{r}</span>
+                  </div>
+                  <input type="number" value={customPay[r]}
+                    onChange={e=>setCustomPay(p=>({...p,[r]:parseInt(e.target.value)||0}))}
+                    style={{...S.input,flex:1,height:36,padding:"6px 10px",fontSize:14,textAlign:"center"}}/>
+                  <span style={{fontSize:11,color:"#8B95A1",flexShrink:0}}>원</span>
+                </div>
+              ))}
+            </div>
+            <button onClick={()=>setCustomPay({...SOLDIER_PAY})} style={{marginTop:10,width:"100%",padding:"8px",borderRadius:10,border:"1px solid #E8ECF0",background:"#F9FAFB",fontSize:12,fontWeight:600,color:"#8B95A1",cursor:"pointer"}}>
+              기본값으로 초기화
+            </button>
+          </div>
+        )}
+
+        {/* 결과 요약 */}
+        <div style={{marginTop:16,background:"linear-gradient(135deg,#EBF3FF,#F3EEFF)",borderRadius:14,padding:"14px 16px",border:"1px solid #A5C9FF"}}>
+          <div style={{fontSize:11,color:"#8B95A1",marginBottom:6}}>예상 총 수령액 (월급 + 내일준비적금 × 1.05)</div>
+          <div style={{fontSize:24,fontWeight:900,color:"#3182F6"}}>{fmtMan(Math.round(totalSavings))}</div>
+          <div style={{display:"flex",gap:12,marginTop:8,fontSize:11,color:"#8B95A1"}}>
+            <span>💵 월급 합계: <b style={{color:"#191F28"}}>{fmtMan(totalSalary)}</b></span>
+            <span>📅 {totalMonths}개월</span>
+          </div>
         </div>
-        <button style={{...S.btn,background:"#3182F6",color:"#fff"}} onClick={()=>setOpen(false)}>확인</button>
+
+        <button style={{...S.btn,background:"#3182F6",color:"#fff",marginTop:14}} onClick={()=>setOpen(false)}>확인</button>
       </div>
     </div>
   );
