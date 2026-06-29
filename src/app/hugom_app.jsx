@@ -791,9 +791,9 @@ export default function App() {
         event: "INSERT",
         schema: "public",
         table: "notifications",
-        filter: `user_id=eq.${profile.id}`,
       }, (payload) => {
         const n = payload.new;
+        if (n.user_id !== profile.id) return; // 내 알림만 처리
         let msg = n.message;
         try { if (typeof msg === "string") msg = JSON.parse(msg); } catch(e) {}
         setNotifs(prev => [{
@@ -927,6 +927,7 @@ export default function App() {
       }),
       is_read: false,
     }).select().single();
+    if (error) console.error("알림 전송 실패:", error);
     if (!error && data) {
       setNotifs(prev => [{
         id: data.id, type: notif.type, text: notif.text,
