@@ -287,7 +287,24 @@ export default function App() {
   const [authState,setAuthState]=useState("loading");
   const unread=notifs.filter(n=>!n.read).length;
   const perfDates=useMemo(()=>profile?calcOutingDates(profile.perf_first_start,profile.perf_cycle_weeks,profile.perf_cycle_days):[],[profile]);
-  const markAllRead=()=>setNotifs(ns=>ns.map(n=>({...n,read:true})));
+  const markAllRead=()=>{
+    setNotifs(ns=>ns.map(n=>({...n,read:true})));
+    // DB도 일괄 읽음 처리
+    if(profile?.id){
+      supabase.from("notifications").update({is_read:true}).eq("user_id",profile.id).eq("is_read",false).then();
+    }
+  };
+
+  const delNotif=async(id)=>{
+    await supabase.from("notifications").delete().eq("id",id);
+    setNotifs(prev=>prev.filter(n=>n.id!==id));
+  };
+
+  const delAllNotifs=async()=>{
+    if(!profile?.id) return;
+    await supabase.from("notifications").delete().eq("user_id",profile.id);
+    setNotifs([]);
+  };
 
   // 앱 시작 시 인증 상태 + 프로필 확인
   useEffect(()=>{
@@ -794,8 +811,78 @@ export default function App() {
         <div className="fi" style={S.overlay} onClick={()=>{setShowNotif(false);markAllRead();}}>
           <div className="su" style={S.sheet} onClick={e=>e.stopPropagation()}>
             <div style={S.handle}/>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}><span style={{fontSize:17,fontWeight:800}}>알림</span>{unread>0&&<button onClick={markAllRead} style={{fontSize:12,color:"#3182F6",fontWeight:700,background:"none",border:"none",cursor:"pointer"}}>모두 읽음</button>}</div>
-            {notifs.length===0?<div style={{textAlign:"center",padding:"48px 0",color:"#B0B8C1",fontSize:14}}>알림이 없어요</div>:notifs.map(n=>(<div key={n.id} style={{display:"flex",gap:12,padding:"12px",borderRadius:12,background:n.read?"transparent":"#EBF3FF",marginBottom:4}}><div style={{width:38,height:38,borderRadius:12,background:"#F2F4F6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{n.type==="leave_suggest"?"🌿":n.type==="visit_request"?"🏠":n.type==="visit_out_suggest"?"🚗":n.type==="connection_request"?"💝":"💌"}</div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:n.read?500:700,color:"#191F28",lineHeight:1.5}}>{n.text}</div>{n.dateRange&&<div style={{fontSize:12,color:"#3182F6",fontWeight:700,marginTop:3,padding:"3px 8px",background:"#EBF3FF",borderRadius:6,display:"inline-block"}}>📅 {n.dateRange}</div>}{n.type==="connection_request"&&n.senderId&&<button onClick={()=>{acceptConnection(n.senderId);}} style={{fontSize:12,color:"#fff",fontWeight:700,background:"#3182F6",border:"none",borderRadius:6,padding:"6px 12px",marginTop:6,cursor:"pointer"}}>수락</button>}<div style={{fontSize:11,color:"#B0B8C1",marginTop:4}}>{n.time}</div></div>{!n.read&&<div style={{width:7,height:7,borderRadius:"50%",background:"#3182F6",marginTop:4,flexShrink:0}}/>}</div>))}
+
+            {/* 헤더 */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <span style={{fontSize:17,fontWeight:800}}>알림</span>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                {unread>0&&(
+                  <button onClick={markAllRead} style={{fontSize:12,color:"#3182F6",fontWeight:700,background:"#EBF3FF",border:"none",borderRadius:8,padding:"5px 10px",cursor:"pointer"}}>
+                    모두 읽음
+                  </button>
+                )}
+                {notifs.length>0&&(
+                  <button onClick={()=>{if(window.confirm("알림을 모두 삭제할까요?"))delAllNotifs();}} style={{fontSize:12,color:"#F04452",fontWeight:700,background:"#FFF0F1",border:"none",borderRadius:8,padding:"5px 10px",cursor:"pointer"}}>
+                    전체 삭제
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 알림 목록 */}
+            {notifs.length===0
+              ? (
+                <div style={{textAlign:"center",padding:"52px 0",color:"#B0B8C1"}}>
+                  <div style={{fontSize:36,marginBottom:10}}>🔔</div>
+                  <div style={{fontSize:14,fontWeight:600}}>알림이 없어요</div>
+                </div>
+              )
+              : notifs.map(n=>{
+                const icon = n.type==="leave_suggest"?"🌿":n.type==="visit_request"?"🏠":n.type==="visit_out_suggest"?"🚗":n.type==="connection_request"?"💝":"💌";
+                const isRead = n.read;
+                return(
+                  <div key={n.id} style={{display:"flex",gap:10,padding:"11px 12px",borderRadius:14,background:isRead?"#F9FAFB":"#EBF3FF",marginBottom:6,border:`1px solid ${isRead?"#F2F4F6":"#C7DCFF"}`,position:"relative"}}>
+
+                    {/* 아이콘 */}
+                    <div style={{width:38,height:38,borderRadius:12,background:isRead?"#E8ECF0":"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0,border:`1px solid ${isRead?"#E8ECF0":"#C7DCFF"}`}}>
+                      {icon}
+                    </div>
+
+                    {/* 내용 */}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:isRead?400:700,color:isRead?"#8B95A1":"#191F28",lineHeight:1.5}}>
+                        {n.text}
+                      </div>
+                      {n.dateRange&&(
+                        <div style={{fontSize:12,color:"#3182F6",fontWeight:700,marginTop:4,padding:"3px 8px",background:"#EBF3FF",borderRadius:6,display:"inline-block"}}>
+                          📅 {n.dateRange}
+                        </div>
+                      )}
+                      {n.type==="connection_request"&&n.senderId&&!isRead&&(
+                        <button onClick={()=>{acceptConnection(n.senderId);}} style={{display:"inline-block",fontSize:12,color:"#fff",fontWeight:700,background:"#3182F6",border:"none",borderRadius:8,padding:"6px 14px",marginTop:6,cursor:"pointer"}}>
+                          💝 수락
+                        </button>
+                      )}
+                      <div style={{fontSize:10,color:"#C0C8D4",marginTop:4}}>{n.time}</div>
+                    </div>
+
+                    {/* 오른쪽: 읽지않음 점 or 삭제 버튼 */}
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",justifyContent:"space-between",flexShrink:0}}>
+                      {!isRead&&(
+                        <div style={{width:8,height:8,borderRadius:"50%",background:"#3182F6",flexShrink:0}}/>
+                      )}
+                      <button
+                        onClick={e=>{e.stopPropagation();delNotif(n.id);}}
+                        style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:"#C0C8D4",padding:"2px 4px",lineHeight:1,marginTop:"auto"}}
+                        title="알림 삭제"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            }
           </div>
         </div>
       )}
