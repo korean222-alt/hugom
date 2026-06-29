@@ -1257,7 +1257,9 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
                       {/* 연결해제 버튼 */}
                       <button onClick={()=>{if(window.confirm("파트너 연결을 해제할까요?"))onDisconnect();}} style={{padding:"8px 12px",background:"#FFF0F1",color:"#F04452",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>연결해제</button>
                     </div>
-                  )
+                  )}
+                </div>
+              ))
               : (
                 <div style={{textAlign:"center",padding:"60px 0",color:"#B0B8C1"}}>
                   <div style={{fontSize:40,marginBottom:12}}>👥</div>
