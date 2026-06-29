@@ -307,6 +307,7 @@ export default function App() {
         return {
           id: n.id, type: msg?.type || "info", text: msg?.text || msg,
           dateRange: msg?.dateRange || null, time: "이전", read: n.is_read,
+          senderId: msg?.senderId || null,
         };
       }));
 
@@ -701,7 +702,7 @@ export default function App() {
           <div className="su" style={S.sheet} onClick={e=>e.stopPropagation()}>
             <div style={S.handle}/>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}><span style={{fontSize:17,fontWeight:800}}>알림</span>{unread>0&&<button onClick={markAllRead} style={{fontSize:12,color:"#3182F6",fontWeight:700,background:"none",border:"none",cursor:"pointer"}}>모두 읽음</button>}</div>
-            {notifs.length===0?<div style={{textAlign:"center",padding:"48px 0",color:"#B0B8C1",fontSize:14}}>알림이 없어요</div>:notifs.map(n=>(<div key={n.id} style={{display:"flex",gap:12,padding:"12px",borderRadius:12,background:n.read?"transparent":"#EBF3FF",marginBottom:4}}><div style={{width:38,height:38,borderRadius:12,background:"#F2F4F6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{n.type==="leave_suggest"?"🌿":n.type==="visit_request"?"🏠":n.type==="visit_out_suggest"?"🚗":"💌"}</div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:n.read?500:700,color:"#191F28",lineHeight:1.5}}>{n.text}</div>{n.dateRange&&<div style={{fontSize:12,color:"#3182F6",fontWeight:700,marginTop:3,padding:"3px 8px",background:"#EBF3FF",borderRadius:6,display:"inline-block"}}>📅 {n.dateRange}</div>}<div style={{fontSize:11,color:"#B0B8C1",marginTop:4}}>{n.time}</div></div>{!n.read&&<div style={{width:7,height:7,borderRadius:"50%",background:"#3182F6",marginTop:4,flexShrink:0}}/>}</div>))}
+            {notifs.length===0?<div style={{textAlign:"center",padding:"48px 0",color:"#B0B8C1",fontSize:14}}>알림이 없어요</div>:notifs.map(n=>(<div key={n.id} style={{display:"flex",gap:12,padding:"12px",borderRadius:12,background:n.read?"transparent":"#EBF3FF",marginBottom:4}}><div style={{width:38,height:38,borderRadius:12,background:"#F2F4F6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{n.type==="leave_suggest"?"🌿":n.type==="visit_request"?"🏠":n.type==="visit_out_suggest"?"🚗":n.type==="connection_request"?"💝":"💌"}</div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:n.read?500:700,color:"#191F28",lineHeight:1.5}}>{n.text}</div>{n.dateRange&&<div style={{fontSize:12,color:"#3182F6",fontWeight:700,marginTop:3,padding:"3px 8px",background:"#EBF3FF",borderRadius:6,display:"inline-block"}}>📅 {n.dateRange}</div>}{n.type==="connection_request"&&n.senderId&&<button onClick={()=>{acceptConnection(n.senderId);}} style={{fontSize:12,color:"#fff",fontWeight:700,background:"#3182F6",border:"none",borderRadius:6,padding:"6px 12px",marginTop:6,cursor:"pointer"}}>수락</button>}<div style={{fontSize:11,color:"#B0B8C1",marginTop:4}}>{n.time}</div></div>{!n.read&&<div style={{width:7,height:7,borderRadius:"50%",background:"#3182F6",marginTop:4,flexShrink:0}}/>}</div>))}
           </div>
         </div>
       )}
@@ -1159,23 +1160,36 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
     });
   };
 
-  // 연결 요청 — 실제 DB에 양방향 partner_id 저장 (PHASE 4)
+  // 연결 요청 — 알림으로 상대방에게 요청 전송 (수락 대기)
   const sendRequest=async()=>{
     if(!found||!profile?.id)return;
-    // 나의 partner_id 업데이트
-    const { error: e1 } = await supabase.from("users").update({ partner_id: found.id }).eq("id", profile.id);
-    // 상대방의 partner_id 업데이트
-    const { error: e2 } = await supabase.from("users").update({ partner_id: profile.id }).eq("id", found.id);
-    if (e1 || e2) { showToast("연결 실패. 다시 시도해주세요."); return; }
-    // 로컬 profile에 partner_id 반영
-    profile.partner_id = found.id;
-    // 파트너 데이터 로드
-    const rel=isGomshin?"my_soldier":"my_gomshin";
-    const partnerObj={...found,relation:rel,status:"accepted"};
-    setFriends([partnerObj]);
-    const msg=isGomshin?`${found.name}님의 군화와 연결됐어요! 파트너 달력을 확인해보세요 💝`:`${found.name}님과 연결됐어요!`;
-    showToast(msg);
+    // 상대방에게 연결 요청 알림 전송
+    if(onAddNotif) {
+      const msg = isGomshin ? `${profile.name}님의 군화가 연결을 요청했습니다.` : `${profile.name}님이 연결을 요청했습니다.`;
+      onAddNotif({type:"connection_request",text:msg,recipientId:found.id,senderId:profile.id});
+    }
+    showToast("연결 요청을 보냈어요!");
     setSubTab("list");setCode("");setFound(null);
+  };
+  
+  // 연결 수락 — 알림에서 수락 버튼 클릭 시 호출
+  const acceptConnection=async(senderId)=>{
+    if(!profile?.id)return;
+    // 양쪽 partner_id 업데이트
+    const { error: e1 } = await supabase.from("users").update({ partner_id: senderId }).eq("id", profile.id);
+    const { error: e2 } = await supabase.from("users").update({ partner_id: profile.id }).eq("id", senderId);
+    if (e1 || e2) { showToast("연결 실패. 다시 시도해주세요."); return; }
+    // 프로필 업데이트
+    profile.partner_id = senderId;
+    // 파트너 데이터 로드
+    const [pu] = await Promise.all([supabase.from("users").select("*").eq("id", senderId).single()]);
+    if(pu.data) {
+      const pd = pu.data;
+      const rel=isGomshin?"my_soldier":"my_gomshin";
+      const partnerObj={id:pd.id,name:pd.name,userType:pd.role==="soldier"?"soldier":"gomshin",enlist:pd.enlist_date,discharge:pd.discharge_date,relation:rel,status:"accepted",leaves:[],schedules:[],pokeCount:0};
+      setFriends([partnerObj]);
+    }
+    showToast("연결되었어요! 💝");
   };
 
   const handleGomshinSend=(type,dateRange)=>{
