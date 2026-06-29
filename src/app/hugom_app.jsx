@@ -293,14 +293,14 @@ export default function App() {
     const loadData = async () => {
       const [lv, sc, nt] = await Promise.all([
         supabase.from("leaves").select("*").eq("user_id", profile.id).order("start_date"),
-        supabase.from("schedules").select("*").eq("user_id", profile.id).order("event_date"),
+        supabase.from("schedules").select("*").eq("user_id", profile.id).order("date"),
         supabase.from("notifications").select("*").eq("user_id", profile.id).order("created_at", { ascending: false }),
       ]);
       if (lv.data) setLeaves(lv.data.map(l => ({
         id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo,
       })));
       if (sc.data) setSchedules(sc.data.map(s => ({
-        id: s.id, event_type: s.event_type, event_date: s.event_date, memo: s.memo, title: s.title,
+        id: s.id, event_type: s.type, event_date: s.date, memo: s.memo, title: s.title,
       })));
       if (nt.data) setNotifs(nt.data.map(n => {
         let msg = n.message;
@@ -325,7 +325,7 @@ export default function App() {
       const [pu, plv, psc, pk1, pk2] = await Promise.all([
         supabase.from("users").select("*").eq("id", partnerId).single(),
         supabase.from("leaves").select("*").eq("user_id", partnerId).order("start_date"),
-        supabase.from("schedules").select("*").eq("user_id", partnerId).order("event_date"),
+        supabase.from("schedules").select("*").eq("user_id", partnerId).order("date"),
         supabase.from("pokes").select("*").eq("receiver_id", partnerId).eq("sender_id", profile.id).single(),
         supabase.from("pokes").select("*").eq("receiver_id", profile.id).eq("sender_id", partnerId).single(),
       ]);
@@ -345,7 +345,7 @@ export default function App() {
         relation: pd.role === "soldier" ? "my_soldier" : "my_gomshin",
         status: "accepted",
         leaves: plv.data ? plv.data.map(l => ({ id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo })) : [],
-        schedules: psc.data ? psc.data.map(s => ({ id: s.id, event_type: s.event_type, event_date: s.event_date, memo: s.memo, title: s.title })) : [],
+        schedules: psc.data ? psc.data.map(s => ({ id: s.id, event_type: s.type, event_date: s.date, memo: s.memo, title: s.title })) : [],
         pokeCount: myPokeCount + theirPokeCount,
       };
       setFriends([partnerObj]);
@@ -471,13 +471,13 @@ export default function App() {
   const addSched = async (s) => {
     const { data, error } = await supabase.from("schedules").insert({
       user_id: profile.id,
-      event_type: s.event_type,
-      event_date: s.event_date,
+      type: s.event_type,
+      date: s.event_date,
       title: s.title || s.event_type,
       memo: s.memo || null,
     }).select().single();
     if (!error && data) {
-      setSchedules(prev => [...prev, { id: data.id, event_type: data.event_type, event_date: data.event_date, memo: data.memo, title: data.title }]);
+      setSchedules(prev => [...prev, { id: data.id, event_type: data.type, event_date: data.date, memo: data.memo, title: data.title }]);
     }
   };
 
