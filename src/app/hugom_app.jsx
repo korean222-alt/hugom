@@ -930,22 +930,26 @@ function CalendarTab({profile,leaves,schedules,perfDates,onAddLeave,onDelLeave,o
           if(isToday) cellBg="#EBF3FF";
           if(dayLeaves.length>0){const lt=LEAVE_TYPES[dayLeaves[0].leave_type];if(lt)cellBg=lt.bg;}
           return(
-            <div key={key} onClick={()=>{if(!readOnly){setSelKey(key);setShowModal(true);}}} style={{minHeight:78,padding:"6px 3px 4px",background:cellBg,borderTop:"1px solid #F2F4F6",borderRight:col<6?"1px solid #F2F4F6":"none",cursor:readOnly?"default":"pointer"}}>
-              <div style={{width:22,height:22,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",background:isToday?"#3182F6":"transparent",marginBottom:1}}>
-                <span style={{fontSize:13,fontWeight:isToday?800:400,lineHeight:1,color:isToday?"#fff":isSun||isHol?"#F04452":isSatD?"#3182F6":"#191F28"}}>{d}</span>
-              </div>
-              {isHol&&<div style={{fontSize:6.5,fontWeight:700,color:"#fff",background:"#F04452",borderRadius:3,padding:"1px 3px",marginBottom:1,display:"inline-block",maxWidth:"100%",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{HOLIDAYS[key]}</div>}
-              {isPerf&&dayLeaves.length===0&&(isPerfStart?<div style={{fontSize:7,fontWeight:700,color:"#FF6B00",background:"#FFF2E8",borderRadius:3,padding:"1px 3px",display:"inline-block"}}>⭐{perfIdx+1}차</div>:<div style={{height:2,background:"#FBBF24",borderRadius:1,margin:"3px 2px 0",opacity:0.5}}/>)}
-              <div style={{display:"flex",flexDirection:"column",gap:1.5,marginTop:1}}>
-                {dayLeaves.slice(0,2).map((l,i)=>{const lt=LEAVE_TYPES[l.leave_type];if(!lt)return null;return(<div key={i} style={{fontSize:7.5,fontWeight:700,borderRadius:4,padding:"2px 4px",background:lt.color,color:"#fff",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",display:"flex",alignItems:"center",gap:2}}><span>{lt.icon}</span><span>{lt.label}</span></div>);})}
-                	                {dayScheds.map((s,i)=>{
+            <div key={key} onClick={()=>{if(!readOnly){setSelKey(key);setShowModal(true);}}} style={{height:92,padding:"6px 3px 4px",background:cellBg,borderTop:"1px solid #F2F4F6",borderRight:col<6?"1px solid #F2F4F6":"none",cursor:readOnly?"default":"pointer",overflow:"hidden",position:"relative"}}>
+	              <div style={{width:22,height:22,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",background:isToday?"#3182F6":"transparent",marginBottom:1}}>
+	                <span style={{fontSize:13,fontWeight:isToday?800:400,lineHeight:1,color:isToday?"#fff":isSun||isHol?"#F04452":isSatD?"#3182F6":"#191F28"}}>{d}</span>
+	              </div>
+	              {isHol&&<div style={{fontSize:6.5,fontWeight:700,color:"#fff",background:"#F04452",borderRadius:3,padding:"1px 3px",marginBottom:1,display:"inline-block",maxWidth:"100%",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{HOLIDAYS[key]}</div>}
+	              {isPerf&&dayLeaves.length===0&&(isPerfStart?<div style={{fontSize:7,fontWeight:700,color:"#FF6B00",background:"#FFF2E8",borderRadius:3,padding:"1px 3px",display:"inline-block"}}>⭐{perfIdx+1}차</div>:<div style={{height:2,background:"#FBBF24",borderRadius:1,margin:"3px 2px 0",opacity:0.5}}/>)}
+	              <div style={{display:"flex",flexDirection:"column",gap:1.5,marginTop:1}}>
+	                {dayLeaves.slice(0,1).map((l,i)=>{const lt=LEAVE_TYPES[l.leave_type];if(!lt)return null;return(<div key={i} style={{fontSize:7.5,fontWeight:700,borderRadius:4,padding:"2px 4px",background:lt.color,color:"#fff",overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",display:"flex",alignItems:"center",gap:2}}><span>{lt.icon}</span><span>{lt.label}</span></div>);})}
+	                {dayScheds.slice(0,2).map((s,i)=>{
                     const et=EVENT_TYPES[s.event_type];if(!et)return null;
                     const displayTitle = s.event_type === "other" ? (s.title || et.label) : et.label;
-                    return(<div key={i} style={{fontSize:7.5,fontWeight:700,borderRadius:4,padding:"2px 4px",background:et.bg,color:et.color,border:`1px solid ${et.border}`,overflow:"hidden",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:2,marginTop:1}}><span>{et.icon}</span><span>{displayTitle}</span></div>);
+                    return(<div key={i} style={{fontSize:7.5,fontWeight:700,borderRadius:4,padding:"2px 4px",background:et.bg,color:et.color,border:`1px solid ${et.border}`,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis",display:"flex",alignItems:"center",gap:2,marginTop:1}}><span>{et.icon}</span><span>{displayTitle}</span></div>);
                   })}
-
-              </div>
-            </div>
+                  {(dayLeaves.length + dayScheds.length > 3) && (
+                    <div style={{fontSize:7.5,color:"#8B95A1",fontWeight:700,marginTop:2,textAlign:"center"}}>
+                      +{dayLeaves.length + dayScheds.length - 3}개 더보기
+                    </div>
+                  )}
+	              </div>
+	            </div>
           );
         })}
       </div>
