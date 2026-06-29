@@ -372,6 +372,7 @@ export default function App() {
           dateRange: msg?.dateRange || null,
           time: "방금",
           read: false,
+          senderId: msg?.senderId || null,
         }, ...prev]);
       })
       .subscribe();
@@ -487,14 +488,40 @@ export default function App() {
   const addNotif = async (notif) => {
     const { data, error } = await supabase.from("notifications").insert({
       user_id: notif.recipientId || profile.id,
-      message: JSON.stringify({ type: notif.type, text: notif.text, dateRange: notif.dateRange || null }),
+      message: JSON.stringify({ 
+        type: notif.type, 
+        text: notif.text, 
+        dateRange: notif.dateRange || null,
+        senderId: notif.senderId || profile.id
+      }),
       is_read: false,
     }).select().single();
     if (!error && data) {
       setNotifs(prev => [{
         id: data.id, type: notif.type, text: notif.text,
         dateRange: notif.dateRange || null, time: "방금", read: false,
+        senderId: notif.senderId || profile.id
       }, ...prev]);
+    }
+  };
+
+  const acceptConnection = async (senderId) => {
+    if (!profile?.id) return;
+    try {
+      // 양쪽 partner_id 업데이트
+      const { error: e1 } = await supabase.from("users").update({ partner_id: senderId }).eq("id", profile.id);
+      const { error: e2 } = await supabase.from("users").update({ partner_id: profile.id }).eq("id", senderId);
+      if (e1 || e2) { alert("연결 실패. 다시 시도해주세요."); return; }
+      
+      // 프로필 로컬 업데이트
+      setProfile(p => ({ ...p, partner_id: senderId }));
+      
+      // 파트너 데이터 로드
+      await loadPartnerData(senderId);
+      alert("연결되었어요! 💝");
+      setShowNotif(false);
+    } catch (err) {
+      console.error("연결 수락 오류:", err);
     }
   };
 
@@ -686,7 +713,7 @@ export default function App() {
       <div style={S.content}>
         {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} perfDates={calOutingDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} linkedSoldier={linkedSoldier} onAddNotif={addNotif} myName={profile.name}/>}
         {tab==="leave"&&!isGomshin&&<LeaveTab profile={profile} leaves={leaves} perfDates={perfDates} onAddLeave={addLeave} onDelLeave={delLeave}/>}
-        {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setViewingFriendId(id);setTab("cal");}} onAddNotif={addNotif} onDisconnect={disconnectPartner} onPoke={poke}/>}
+        {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setViewingFriendId(id);setTab("cal");}} onAddNotif={addNotif} onDisconnect={disconnectPartner} onPoke={poke} onAccept={acceptConnection}/>}
         {tab==="profile"&&<ProfileTab profile={profile} setAuthState={setAuthState} setProfile={async (updater) => {
           const next = typeof updater === "function" ? updater(profile) : updater;
           setProfile(next);
@@ -1183,25 +1210,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
     setSubTab("list");setCode("");setFound(null);
   };
   
-  // 연결 수락 — 알림에서 수락 버튼 클릭 시 호출
-  const acceptConnection=async(senderId)=>{
-    if(!profile?.id)return;
-    // 양쪽 partner_id 업데이트
-    const { error: e1 } = await supabase.from("users").update({ partner_id: senderId }).eq("id", profile.id);
-    const { error: e2 } = await supabase.from("users").update({ partner_id: profile.id }).eq("id", senderId);
-    if (e1 || e2) { showToast("연결 실패. 다시 시도해주세요."); return; }
-    // 프로필 업데이트
-    profile.partner_id = senderId;
-    // 파트너 데이터 로드
-    const [pu] = await Promise.all([supabase.from("users").select("*").eq("id", senderId).single()]);
-    if(pu.data) {
-      const pd = pu.data;
-      const rel=isGomshin?"my_soldier":"my_gomshin";
-      const partnerObj={id:pd.id,name:pd.name,userType:pd.role==="soldier"?"soldier":"gomshin",enlist:pd.enlist_date,discharge:pd.discharge_date,relation:rel,status:"accepted",leaves:[],schedules:[],pokeCount:0};
-      setFriends([partnerObj]);
-    }
-    showToast("연결되었어요! 💝");
-  };
+
 
   const handleGomshinSend=(type,dateRange)=>{
     if(!myBf||!onAddNotif)return;
