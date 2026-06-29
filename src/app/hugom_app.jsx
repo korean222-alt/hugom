@@ -1850,19 +1850,20 @@ function ServiceTimeline({profile,rankInfo,leaves}){
   );
 }
 function FeedbackForm({ userProfile }) {
+  const [open, setOpen] = useState(false);
   const [feedType, setFeedType] = useState("bug");
   const [msg, setMsg] = useState("");
   const [done, setDone] = useState(false);
 
   const TYPE_OPTS = [
-    { id:"bug",   icon:"🐛", label:"버그 신고" },
-    { id:"feat",  icon:"✨", label:"기능 제안" },
-    { id:"etc",   icon:"💬", label:"기타 문의" },
+    { id:"bug",  icon:"🐛", label:"버그 신고" },
+    { id:"feat", icon:"✨", label:"기능 제안" },
+    { id:"etc",  icon:"💬", label:"기타 문의" },
   ];
 
   const handleSend = () => {
-    if (msg.trim().length < 10) {
-      alert("내용을 10자 이상 입력해주세요");
+    if (msg.trim().length < 5) {
+      alert("내용을 5자 이상 입력해주세요");
       return;
     }
     const type = TYPE_OPTS.find(t=>t.id===feedType);
@@ -1872,55 +1873,89 @@ function FeedbackForm({ userProfile }) {
 사용자: ${userProfile?.name||"미상"} (${userProfile?.userType==="gomshin"?"곰신":"군화"})
 날짜: ${new Date().toLocaleString("ko-KR")}
 
-─────────────────
+─────────────────────
 ${msg.trim()}
-─────────────────
+─────────────────────
 `
     );
     window.location.href = `mailto:gnsdl2309@naver.com?subject=${subject}&body=${body}`;
     setDone(true);
     setMsg("");
+    setTimeout(()=>setOpen(false), 2000);
   };
 
-  if (done) return (
-    <div style={{...S.card,border:"1px solid #B7F0D5",background:"#E8FBF3"}}>
-      <div style={{textAlign:"center",padding:"12px 0"}}>
-        <div style={{fontSize:28,marginBottom:6}}>🐻</div>
-        <div style={{fontSize:14,fontWeight:800,color:"#05C072"}}>메일 앱이 열렸어요!</div>
-        <div style={{fontSize:12,color:"#8B95A1",marginTop:4,lineHeight:1.6}}>전송 버튼을 눌러 완료해주세요.<br/>소중한 의견 감사해요 💚</div>
-        <button onClick={()=>setDone(false)} style={{marginTop:10,padding:"8px 20px",borderRadius:100,background:"#05C072",color:"#fff",border:"none",fontSize:13,fontWeight:700,cursor:"pointer"}}>또 보내기</button>
+  // 접힌 상태 — 작은 버튼
+  if (!open) return (
+    <button
+      onClick={()=>setOpen(true)}
+      style={{
+        display:"flex",alignItems:"center",gap:8,
+        width:"100%",padding:"10px 14px",
+        borderRadius:12,border:"1px solid #E8ECF0",
+        background:"#F9FAFB",cursor:"pointer",
+        textAlign:"left",
+      }}
+    >
+      <span style={{fontSize:16}}>💌</span>
+      <div style={{flex:1}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#4E5968"}}>개발자에게 피드백 보내기</div>
+        <div style={{fontSize:11,color:"#B0B8C1",marginTop:1}}>버그·기능 제안을 알려주세요</div>
       </div>
+      <span style={{fontSize:12,color:"#B0B8C1"}}>▼</span>
+    </button>
+  );
+
+  // 완료 상태
+  if (done) return (
+    <div style={{padding:"20px 16px",borderRadius:16,border:"1px solid #B7F0D5",background:"#E8FBF3",textAlign:"center"}}>
+      <div style={{fontSize:28,marginBottom:6}}>🐻</div>
+      <div style={{fontSize:14,fontWeight:800,color:"#05C072"}}>메일 앱이 열렸어요!</div>
+      <div style={{fontSize:12,color:"#8B95A1",marginTop:4,lineHeight:1.6}}>전송 버튼을 눌러 완료해주세요<br/>소중한 의견 감사해요 💚</div>
     </div>
   );
 
+  // 펼친 상태 — 입력 폼
   return (
-    <div style={{...S.card,border:"1px solid #E8ECF0"}}>
-      <div style={{fontSize:14,fontWeight:700,marginBottom:4}}>💌 개발자에게 피드백 보내기</div>
-      <div style={{fontSize:12,color:"#8B95A1",lineHeight:1.6,marginBottom:12}}>
-        버그 발견, 추가됐으면 하는 기능이 있으신가요?<br/>
-        의견을 보내주시면 적극 반영할게요 🐻
+    <div style={{borderRadius:16,border:"1px solid #C7DCFF",background:"#EBF3FF",overflow:"hidden"}}>
+
+      {/* 헤더 */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",borderBottom:"1px solid #C7DCFF",background:"#fff"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:16}}>💌</span>
+          <span style={{fontSize:14,fontWeight:800,color:"#191F28"}}>개발자에게 피드백 보내기</span>
+        </div>
+        <button onClick={()=>{setOpen(false);setMsg("");}} style={{background:"none",border:"none",fontSize:18,color:"#B0B8C1",cursor:"pointer",lineHeight:1}}>✕</button>
       </div>
 
-      {/* 유형 선택 */}
-      <div style={{display:"flex",gap:6,marginBottom:12}}>
-        {TYPE_OPTS.map(t=>(
-          <button key={t.id} onClick={()=>setFeedType(t.id)} style={{flex:1,padding:"8px 4px",borderRadius:10,border:`1.5px solid ${feedType===t.id?"#3182F6":"#E8ECF0"}`,background:feedType===t.id?"#EBF3FF":"#F9FAFB",fontSize:12,fontWeight:700,color:feedType===t.id?"#3182F6":"#8B95A1",cursor:"pointer"}}>
-            {t.icon}<br/><span style={{fontSize:10}}>{t.label}</span>
-          </button>
-        ))}
+      {/* 폼 내용 */}
+      <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:12}}>
+
+        {/* 유형 선택 */}
+        <div style={{display:"flex",gap:6}}>
+          {TYPE_OPTS.map(t=>(
+            <button key={t.id} onClick={()=>setFeedType(t.id)} style={{flex:1,padding:"8px 4px",borderRadius:10,border:`1.5px solid ${feedType===t.id?"#3182F6":"#D1DCF0"}`,background:feedType===t.id?"#3182F6":"#fff",fontSize:12,fontWeight:700,color:feedType===t.id?"#fff":"#8B95A1",cursor:"pointer"}}>
+              {t.icon}<br/><span style={{fontSize:10}}>{t.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* 내용 입력 */}
+        <textarea
+          value={msg}
+          onChange={e=>setMsg(e.target.value)}
+          placeholder="자세히 알려주실수록 빠르게 반영할 수 있어요! (5자 이상)"
+          style={{...S.input,height:90,resize:"none",fontSize:13,lineHeight:1.6,fontFamily:"inherit",background:"#fff"}}
+          autoFocus
+        />
+
+        {/* 전송 버튼 */}
+        <button
+          onClick={handleSend}
+          style={{...S.btn,background:"linear-gradient(135deg,#2D4A1E,#556B2F)",color:"#fff",boxShadow:"0 4px 14px rgba(61,90,30,.25)"}}
+        >
+          📬 메일로 보내기
+        </button>
       </div>
-
-      {/* 내용 입력 */}
-      <textarea
-        value={msg}
-        onChange={e=>setMsg(e.target.value)}
-        placeholder="자세히 알려주실수록 빠르게 반영할 수 있어요! (10자 이상)"
-        style={{...S.input,height:100,resize:"none",fontSize:13,lineHeight:1.6,marginBottom:12,fontFamily:"inherit"}}
-      />
-
-      <button onClick={handleSend} style={{...S.btn,background:"linear-gradient(135deg,#2D4A1E,#556B2F)",color:"#fff",boxShadow:"0 4px 14px rgba(61,90,30,.25)"}}>
-        📬 메일로 보내기 (gnsdl2309@naver.com)
-      </button>
     </div>
   );
 }
