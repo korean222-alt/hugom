@@ -734,11 +734,11 @@ export default function App() {
       <style>{`*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}button:active{transform:scale(0.95)!important;transition:transform 0.08s;}::-webkit-scrollbar{display:none;}@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}.su{animation:slideUp .25s cubic-bezier(.34,1.2,.64,1);}.fi{animation:fadeIn .18s ease;}.shake{animation:shake .4s ease;}`}</style>
       <header style={S.header}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
-          {viewingFriend&&<button onClick={()=>setViewingFriendId(null)} style={{background:"#F2F4F6",border:"none",borderRadius:8,padding:"6px 10px",fontSize:13,fontWeight:600,color:"#4E5968",cursor:"pointer"}}>← 내 달력</button>}
-          <div style={{fontSize:17,fontWeight:800,color:"#191F28"}}>
-            {isGomshin?"🐻 휴곰 — 곰신 달력":"🐻 휴곰 — 군화 달력"}
-            {viewingFriend&&<span style={{fontSize:13,color:"#8B95A1",fontWeight:500,marginLeft:6}}>{viewingFriend.name}의 달력</span>}
-            {linkedSoldier&&!viewingFriend&&tab==="cal"&&<span style={{fontSize:11,color:"#8B95A1",fontWeight:500,marginLeft:6}}>{linkedSoldier.name} 보기</span>}
+          {viewingFriend&&<button onClick={()=>setViewingFriendId(null)} style={{background:"#F2F4F6",border:"none",borderRadius:8,padding:"6px 8px",fontSize:11,fontWeight:600,color:"#4E5968",cursor:"pointer",whiteSpace:"nowrap"}}>← 내 달력</button>}
+          <div style={{fontSize:15,fontWeight:800,color:"#191F28",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+            {isGomshin?"🐻 휴곰 — 곰신":"🐻 휴곰 — 군화"}
+            {viewingFriend&&<span style={{fontSize:12,color:"#8B95A1",fontWeight:500,marginLeft:4}}>{viewingFriend.name}</span>}
+            {linkedSoldier&&!viewingFriend&&tab==="cal"&&<span style={{fontSize:11,color:"#8B95A1",fontWeight:500,marginLeft:4}}>{linkedSoldier.name}</span>}
           </div>
         </div>
         <button onClick={()=>setShowNotif(true)} style={{position:"relative",background:"none",border:"none",padding:4,cursor:"pointer"}}>
@@ -1583,10 +1583,10 @@ function ProfileTab({profile,setProfile,leaves,onReset,setAuthState,setLeaves,se
           <div className="su" style={S.sheet} onClick={e=>e.stopPropagation()}>
             <div style={S.handle}/>
             <div style={{fontSize:16,fontWeight:800,marginBottom:4}}>진급 설정 수정</div>
-            <div style={{fontSize:12,color:"#8B95A1",marginBottom:18}}>늦게 진급한 계급의 개월 수를 입력해요</div>
+            <div style={{fontSize:12,color:"#8B95A1",marginBottom:18}}>진급 시간 조정 (음수: 조기진급, 양수: 진급누락)</div>
             <div style={{background:"#F9FAFB",borderRadius:14,padding:"12px 16px",marginBottom:20,border:"1px solid #E8ECF0"}}>
               <div style={{fontSize:13,fontWeight:700,color:"#333D4B",marginBottom:10}}>진급누락 개월 수</div>
-              {["이등병","일병","상병"].map(r=>(<div key={r} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><div style={{width:48,height:28,borderRadius:7,background:"#E8ECF0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:11,fontWeight:700,color:"#8B95A1"}}>{r}</span></div><input style={{...S.input,flex:1,height:38,padding:"6px 12px",fontSize:14}} type="number" min="0" max="24" value={editMissed[r]||""} onChange={e=>setEditMissed(p=>({...p,[r]:parseInt(e.target.value)||0}))} placeholder="0"/><span style={{fontSize:12,color:"#8B95A1",flexShrink:0}}>개월</span></div>))}
+              {["이등병","일병","상병"].map(r=>(<div key={r} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><div style={{width:48,height:28,borderRadius:7,background:"#E8ECF0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:11,fontWeight:700,color:"#8B95A1"}}>{r}</span></div><input style={{...S.input,flex:1,height:38,padding:"6px 12px",fontSize:14}} type="number" min="-24" max="24" value={editMissed[r]||""} onChange={e=>setEditMissed(p=>({...p,[r]:parseInt(e.target.value)||0}))} placeholder="0"/><span style={{fontSize:12,color:"#8B95A1",flexShrink:0}}>개월</span></div>))}
             </div>
             {(()=>{try{const preview=calcRankInfo(profile.enlist,editMissed);return(<div style={{background:"#EBF3FF",borderRadius:12,padding:"12px 14px",marginBottom:16,border:"1px solid #A5C9FF"}}><div style={{fontSize:11,fontWeight:700,color:"#3182F6",marginBottom:8}}>변경 후 진급 예정일</div>{["이등병","일병","상병"].map(r=>(<div key={r} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"3px 0",color:"#4E5968"}}><span>{r} → {RANK_LABELS[RANK_LABELS.indexOf(r)+1]}</span><span style={{fontWeight:700,color:"#191F28"}}>{fmtDate(preview.promotions[r])}</span></div>))}</div>);}catch{return null;}})()}
             <button style={{...S.btn,background:"#3182F6",color:"#fff",boxShadow:"0 4px 14px rgba(49,130,246,.28)"}} onClick={saveRankEdit}>저장</button>
@@ -1741,6 +1741,13 @@ function ServiceTimeline({profile,rankInfo,leaves}){
 }
 function SalaryCalc({rankInfo, profile}){
   const [open, setOpen] = useState(false);
+  const [showPayEdit, setShowPayEdit] = useState(false);
+  const [customPay, setCustomPay] = useState({
+    이등병: SOLDIER_PAY['이등병'],
+    일병: SOLDIER_PAY['일병'],
+    상병: SOLDIER_PAY['상병'],
+    병장: SOLDIER_PAY['병장']
+  });
   
   // 프로필의 missedMonths를 반영한 실제 복무 기간 계산
   const actualDurations = useMemo(() => {
@@ -1761,10 +1768,10 @@ function SalaryCalc({rankInfo, profile}){
   const totalSalary = useMemo(() => {
     let total = 0;
     RANK_LABELS.forEach(r => {
-      total += (SOLDIER_PAY[r] || 0) * (durations[r] || 0);
+      total += (customPay[r] || 0) * (durations[r] || 0);
     });
     return total;
-  }, [durations]);
+  }, [durations, customPay]);
 
   const totalSavings = useMemo(() => {
     const months = Object.values(durations).reduce((a, b) => a + b, 0);
@@ -1787,7 +1794,7 @@ function SalaryCalc({rankInfo, profile}){
     <div className="fi" style={S.overlay} onClick={()=>setOpen(false)}>
       <div className="su" style={S.sheet} onClick={e=>e.stopPropagation()}>
         <div style={S.handle}/>
-        <div style={{fontSize:16,fontWeight:800,marginBottom:18}}>계급별 복무 기간 설정</div>
+        <div style={{fontSize:16,fontWeight:800,marginBottom:18}}>계급별 복무 기간 및 월급 설정</div>
         <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:20}}>
           {RANK_LABELS.map(r => (
             <div key={r} style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -1804,6 +1811,28 @@ function SalaryCalc({rankInfo, profile}){
             </div>
           ))}
         </div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#191F28"}}>월급</div>
+          <button onClick={()=>setShowPayEdit(!showPayEdit)} style={{fontSize:11,color:"#3182F6",background:"#EBF3FF",border:"none",borderRadius:6,padding:"4px 8px",cursor:"pointer",fontWeight:600}}>
+            {showPayEdit?"접기":"수정"}
+          </button>
+        </div>
+        {showPayEdit&&(
+          <div style={{background:"#FFF8E8",borderRadius:12,padding:"12px 14px",marginBottom:14,border:"1px solid #FFDB9A"}}>
+            {RANK_LABELS.map(r=>(
+              <div key={r} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                <span style={{fontSize:12,fontWeight:600,color:"#4E5968",width:40}}>{r}</span>
+                <input 
+                  type="number" 
+                  value={customPay[r]} 
+                  onChange={e=>setCustomPay(p=>({...p,[r]:parseInt(e.target.value)||0}))}
+                  style={{...S.input,flex:1,height:32,padding:"4px 8px",fontSize:12}}
+                />
+                <span style={{fontSize:11,color:"#8B95A1",width:20}}>원</span>
+              </div>
+            ))}
+          </div>
+        )}
         <div style={{background:"#F9FAFB",borderRadius:12,padding:"14px",marginBottom:20}}>
           <div style={{fontSize:12,color:"#8B95A1",marginBottom:4}}>예상 총 수령액 (월급+내일준비적금)</div>
           <div style={{fontSize:20,fontWeight:900,color:"#191F28"}}>{fmtMan(Math.round(totalSavings))}</div>
