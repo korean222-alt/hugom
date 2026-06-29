@@ -300,7 +300,7 @@ export default function App() {
         id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo,
       })));
       if (sc.data) setSchedules(sc.data.map(s => ({
-        id: s.id, event_type: s.event_type, event_date: s.event_date, memo: s.memo,
+        id: s.id, event_type: s.event_type, event_date: s.event_date, memo: s.memo, title: s.title,
       })));
       if (nt.data) setNotifs(nt.data.map(n => {
         let msg = n.message;
@@ -345,7 +345,7 @@ export default function App() {
         relation: pd.role === "soldier" ? "my_soldier" : "my_gomshin",
         status: "accepted",
         leaves: plv.data ? plv.data.map(l => ({ id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo })) : [],
-        schedules: psc.data ? psc.data.map(s => ({ id: s.id, event_type: s.event_type, event_date: s.event_date, memo: s.memo })) : [],
+        schedules: psc.data ? psc.data.map(s => ({ id: s.id, event_type: s.event_type, event_date: s.event_date, memo: s.memo, title: s.title })) : [],
         pokeCount: myPokeCount + theirPokeCount,
       };
       setFriends([partnerObj]);
@@ -948,7 +948,7 @@ function CalendarTab({profile,leaves,schedules,perfDates,onAddLeave,onDelLeave,o
         {Object.values(LEAVE_TYPES).map(v=>(<div key={v.label} style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:2,background:v.color}}/><span style={{fontSize:11,color:"#8B95A1"}}>{v.label}</span></div>))}
       </div>
       {showModal&&selKey&&<EventModal dateKey={selKey} leaves={leaves} schedules={schedules} profile={profile} onAddLeave={onAddLeave} onDelLeave={onDelLeave} onAddSched={onAddSched} onDelSched={onDelSched} onClose={()=>setShowModal(false)}/>}
-      {showPicker&&<MultiRangePicker onClose={()=>setShowPicker(false)} onDone={(ls)=>{onAddLeave(ls);setShowPicker(false);}}/>}
+      {showPicker&&<MultiRangePicker leaves={leaves} profile={profile} onClose={()=>setShowPicker(false)} onDone={(ls)=>{onAddLeave(ls);setShowPicker(false);}}/>}
       {showGomshinPanel&&linkedSoldier&&<GomshinSuggestPanel partnerName={linkedSoldier.name} onSend={handleGomshinSuggest} onClose={()=>setShowGomshinPanel(false)}/>}
     </div>
   );
@@ -1171,7 +1171,7 @@ function LeaveTab({profile,leaves,perfDates,onAddLeave,onDelLeave}){
       {upcoming.length>0&&<><div style={S.sectionTitle}>다가오는 휴가</div>{upcoming.map(l=><LeaveCard key={l.id} leave={l} onDelete={()=>onDelLeave(l.id)}/>)}</>}
       {past.length>0&&<><div style={{...S.sectionTitle,marginTop:4}}>지난 휴가</div>{past.map(l=><LeaveCard key={l.id} leave={l} onDelete={()=>onDelLeave(l.id)} past/>)}</>}
       <button style={{...S.btn,background:"#3182F6",color:"#fff",boxShadow:"0 4px 14px rgba(49,130,246,.28)"}} onClick={()=>setShowPicker(true)}>+ 휴가 등록</button>
-      {showPicker&&<MultiRangePicker onClose={()=>setShowPicker(false)} onDone={(ls)=>{onAddLeave(ls);setShowPicker(false);}}/>}
+      {showPicker&&<MultiRangePicker leaves={leaves} profile={profile} onClose={()=>setShowPicker(false)} onDone={(ls)=>{onAddLeave(ls);setShowPicker(false);}}/>}
     </div>
   );
 }
