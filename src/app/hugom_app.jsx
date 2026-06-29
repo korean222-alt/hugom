@@ -512,9 +512,13 @@ export default function App() {
       .single();
 
     // 페이스북 스타일: 내가 이미 찔렀고 상대방이 아직 안 찔렀으면 못 찌름
-    if (myPoke && (!theirPoke || myPoke.last_poke_at > theirPoke.last_poke_at)) {
-      alert("상대방이 콕 찌를 때까지 기다려주세요! ⏳");
-      return;
+    // 또는 내가 찔렀는데 상대방이 그 이후에 찌르지 않았으면 못 찌름
+    if (myPoke) {
+      // 내가 찌른 시간과 상대방이 찌른 시간 비교
+      if (!theirPoke || new Date(myPoke.last_poke_at) > new Date(theirPoke.last_poke_at)) {
+        alert("상대방이 콕 찌를 때까지 기다려주세요! ⏳");
+        return;
+      }
     }
     
     if (myPoke) {
@@ -1113,6 +1117,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
   const [found,setFound]=useState(null);
   const [toast,setToast]=useState("");
   const [showGomshinSuggest,setShowGomshinSuggest]=useState(false);
+  const [expandedFriendId,setExpandedFriendId]=useState(null);
   const today=toKey(new Date());
   const isGomshin=profile.userType==="gomshin";
   const accepted=friends.filter(f=>f.status==="accepted");
@@ -1202,12 +1207,12 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
             </div>
           )}
 
-          {/* 군화: 친구 목록 */}
+          {/* 군화: 친구 목록 - 아코디언 스타일 */}
           {!isGomshin&&<>
             {accepted.length>0
               ? accepted.map(f=>(
-                <div key={f.id} style={{display:"flex",flexDirection:"column",gap:8}}>
-                  <div style={{...S.card,display:"flex",alignItems:"center",gap:12}}>
+                <div key={f.id} style={{display:"flex",flexDirection:"column",gap:0}}>
+                  <div onClick={()=>setExpandedFriendId(expandedFriendId===f.id?null:f.id)} style={{...S.card,display:"flex",alignItems:"center",gap:12,cursor:"pointer",borderRadius:expandedFriendId===f.id?"16px 16px 0 0":"16px",transition:"all 0.2s"}}>
                     <div style={{width:44,height:44,borderRadius:14,background:"#F2F4F6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>
                       {f.userType==="soldier"?"🪖":"💝"}
                     </div>
@@ -1218,20 +1223,24 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
                       </div>
                     </div>
                     <div style={{display:"flex",gap:6}}>
-                      <button onClick={()=>onViewFriendCal(f.id)} style={{padding:"8px 12px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>📅 달력</button>
-                      <button onClick={()=>{if(window.confirm("파트너 연결을 해제할까요?"))onDisconnect();}} style={{padding:"8px 10px",background:"#FFF0F1",color:"#F04452",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>연결해제</button>
+                      <button onClick={(e)=>{e.stopPropagation();onViewFriendCal(f.id);}} style={{padding:"8px 12px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>📅 달력</button>
+                      <button onClick={(e)=>{e.stopPropagation();if(window.confirm("파트너 연결을 해제할까요?"))onDisconnect();}} style={{padding:"8px 10px",background:"#FFF0F1",color:"#F04452",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>연결해제</button>
                     </div>
                   </div>
-                  {/* 군화 전용 제안 버튼 */}
-                  <div style={{background:"#EBF3FF",borderRadius:16,padding:"12px 14px",border:"1px solid #A5C9FF",marginBottom:10}}>
-                    <div style={{fontSize:12,fontWeight:700,color:"#3182F6",marginBottom:8}}>✈️ 휴가/면회 같이 쓰자고 제안하기</div>
-                    <button onClick={()=>{setFound(f);setShowGomshinSuggest(true);}} style={{...S.btn,background:"#3182F6",color:"#fff",padding:"10px",fontSize:14}}>💌 날짜 선택해서 제안 보내기</button>
-                  </div>
-                  {/* 콕 찌르기 버튼 */}
-                  <div style={{background:"#FFF8E8",borderRadius:16,padding:"12px 14px",border:"1px solid #FFDB9A"}}>
-                    <div style={{fontSize:12,fontWeight:700,color:"#E65100",marginBottom:8}}>👋 콕 찌르기</div>
-                    <button onClick={()=>onPoke(f.id)} style={{...S.btn,background:"linear-gradient(135deg,#FF9500,#FF6B00)",color:"#fff",padding:"10px",fontSize:14}}>👉 콕 찌르기{f.pokeCount>0?` (${f.pokeCount}번)`:""}</button>
-                  </div>
+                  {expandedFriendId===f.id&&(
+                    <div style={{background:"#F9FAFB",borderRadius:"0 0 16px 16px",padding:"12px 16px",display:"flex",flexDirection:"column",gap:10,borderLeft:"1px solid #E8ECF0",borderRight:"1px solid #E8ECF0",borderBottom:"1px solid #E8ECF0"}}>
+                      {/* 군화 전용 제안 버튼 */}
+                      <div>
+                        <div style={{fontSize:12,fontWeight:700,color:"#3182F6",marginBottom:8}}>✈️ 휴가/면회 같이 쓰자고 제안하기</div>
+                        <button onClick={()=>{setFound(f);setShowGomshinSuggest(true);}} style={{...S.btn,background:"#3182F6",color:"#fff",padding:"10px",fontSize:14,width:"100%"}}>💌 날짜 선택해서 제안 보내기</button>
+                      </div>
+                      {/* 콕 찌르기 버튼 */}
+                      <div>
+                        <div style={{fontSize:12,fontWeight:700,color:"#E65100",marginBottom:8}}>👋 콕 찌르기</div>
+                        <button onClick={()=>onPoke(f.id)} style={{...S.btn,background:"linear-gradient(135deg,#FF9500,#FF6B00)",color:"#fff",padding:"10px",fontSize:14,width:"100%"}}>👉 콕 찌르기{f.pokeCount>0?` (${f.pokeCount}번)`:""}</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))
               : (
