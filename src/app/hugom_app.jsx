@@ -3,10 +3,23 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
-const FORBIDDEN_WORDS = ['사단', '여단', '연대', '대대', '중대', '소대', '분대', '군단', '사령부', '제0부대', '제1부대', '제2부대', '제3부대', '제4부대', '제5부대', '제6부대', '제7부대', '제8부대', '제9부대', '부대번호', '통상명칭', '기지', '영내', '영외', '주둔지', '비행단', '전투비행단', '전비', '0비', '1비', '2비', '3비', '4비', '5비', '6비', '7비', '8비', '9비', '포대', '사이트', '관제대', '전대', '전방', 'GOP', 'GP', '페바', 'FEBA', '예비사단', '신교대', '훈련소', '함대', '전단', '고속정대', '함정', '0함대', '도서부대', '연평부대', '백령부대', '훈련', '작전', '검열', '검열관', '비상소집', '등화관제', '불시훈련', '대침투', '전술훈련', '기동훈련', '합동훈련', '호국훈련', '화랑훈련', '충무훈련', '재난대비', '유격', '혹한기', '동계훈련', '전술행군', '행군', '과학화전투훈련', 'KCTC', 'ATT', 'BCT', 'RCT', 'ORE', 'ORI', '소태', '활주로', '피해복구', '야간비행', '대공방어', 'ATS', '해상기동훈련', '사격훈련', '함포사격', '항해', '출항', '입항', '수로조사', '전투기', '헬기', '전차', '장갑차', '미사일', '패트리어트', '천궁', '탄약고', '무기고', '장비결함', '가동률', '당직사령', '당직사관', '통제실', '지통실', '지휘통제실', '탄약관리', '위병소', '초소', '근무스케줄', '상황발생', '5분대기조', '5대기', 'UFS', '을지', '자유의방패', 'FS', '연합훈련', '독수리훈련', '키리졸브', '을지연습'];
+const FORBIDDEN_WORDS = [
+  '사단', '여단', '연대', '대대', '중대', '소대', '분대', '군단', '사령부', '부대번호', '통상명칭', '기지', '영내', '영외', '주둔지',
+  '비행단', '전투비행단', '전비', '포대', '사이트', '관제대', '전대', '전방', 'GOP', 'GP', '페바', 'FEBA', '예비사단', '신교대', '훈련소',
+  '함대', '전단', '고속정대', '함정', '도서부대', '연평부대', '백령부대', '훈련', '작전', '검열', '검열관', '비상소집', '등화관제', '불시훈련',
+  '대침투', '전술훈련', '기동훈련', '합동훈련', '호국훈련', '화랑훈련', '충무훈련', '재난대비', '유격', '혹한기', '동계훈련', '전술행군', '행군',
+  '과학화전투훈련', 'KCTC', 'ATT', 'BCT', 'RCT', 'ORE', 'ORI', '활주로', '피해복구', '야간비행', '대공방어', 'ATS', '해상기동훈련',
+  '사격훈련', '함포사격', '항해', '출항', '입항', '수로조사', '전투기', '헬기', '전차', '장갑차', '미사일', '패트리어트', '천궁', '탄약고',
+  '무기고', '장비결함', '가동률', '당직사령', '당직사관', '통제실', '지통실', '지휘통제실', '탄약관리', '위병소', '초소', '상황발생',
+  '5분대기조', '5대기', 'UFS', '을지', '자유의방패', 'FS', '연합훈련', '독수리훈련', '키리졸브', '을지연습', '암호', '비밀', '대외비',
+  '좌표', '위도', '경도', '위치', '배치도', '무기체계', '병력현황', '출동', '대기', '당직', '순찰', '보고'
+];
+
 const checkForbidden = (text) => {
   if (!text) return null;
-  const found = FORBIDDEN_WORDS.find(w => text.includes(w));
+  // 공백 제거 후 체크하여 '사 단' 같은 우회 시도 방지
+  const cleanText = text.replace(/\s/g, '');
+  const found = FORBIDDEN_WORDS.find(w => cleanText.includes(w) || text.includes(w));
   return found ? found : null;
 };
 
@@ -153,7 +166,29 @@ function WarnModal({ msg, onClose }) {
 }
 
 // ===================== 랜딩 페이지 (로그인 전) =====================
+function LegalModal({ onClose }) {
+  return (
+    <div className="fi" style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
+      <div className="su" style={{background:"#fff",borderRadius:24,width:"100%",maxWidth:400,maxHeight:"80vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{padding:"20px",borderBottom:"1px solid #F2F4F6",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontSize:16,fontWeight:800}}>약관 및 방침</div>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer"}}>✕</button>
+        </div>
+        <div style={{padding:"20px",overflowY:"auto",fontSize:13,lineHeight:1.6,color:"#4E5968"}}>
+          <div style={{fontWeight:800,marginBottom:8,color:"#191F28"}}>1. 이용약관</div>
+          <div style={{marginBottom:16}}>본 서비스는 군사보안법 준수를 최우선으로 합니다. 부대 위치, 작전 등 안보 위해 정보를 입력할 수 없으며, 위반 시 모든 책임은 사용자에게 있습니다.</div>
+          <div style={{fontWeight:800,marginBottom:8,color:"#191F28"}}>2. 개인정보처리방침</div>
+          <div style={{marginBottom:16}}>카카오 식별자와 군 복무 정보(입대일 등)를 서비스 제공 목적으로만 수집하며, 탈퇴 시 즉시 파기합니다.</div>
+          <div style={{fontSize:11,color:"#B0B8C1",textAlign:"center"}}>상세 내용은 LEGAL.md를 참조하세요</div>
+        </div>
+        <button onClick={onClose} style={{margin:"0 20px 20px",padding:"14px",borderRadius:14,background:"#3182F6",color:"#fff",border:"none",fontWeight:700,cursor:"pointer"}}>확인</button>
+      </div>
+    </div>
+  );
+}
+
 function LandingPage() {
+  const [showLegal, setShowLegal] = useState(false);
   return (
     <div style={{...S.wrap, overflowY:"auto"}}>
       <style>{`*{box-sizing:border-box;margin:0;padding:0;}button:active{transform:scale(0.97)!important;}::-webkit-scrollbar{display:none;}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}.su{animation:slideUp .35s cubic-bezier(.34,1.2,.64,1);}.fi{animation:fadeIn .4s ease;}`}</style>
@@ -209,10 +244,11 @@ function LandingPage() {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="#191919"><path d="M12 3C6.48 3 2 6.92 2 11.76c0 3.06 1.87 5.75 4.71 7.3l-1.2 4.47 4.98-3.3A11.5 11.5 0 0012 20.52c5.52 0 10-3.92 10-8.76C22 6.92 17.52 3 12 3z"/></svg>
           카카오로 시작하기
         </button>
-        <div style={{textAlign:"center",fontSize:11,color:"#C0C8D4",marginTop:12}}>
+        <div style={{textAlign:"center",fontSize:11,color:"#C0C8D4",marginTop:12,cursor:"pointer",textDecoration:"underline"}} onClick={()=>setShowLegal(true)}>
           로그인 시 서비스 이용약관 및 개인정보처리방침에 동의하게 됩니다
         </div>
       </div>
+      {showLegal && <LegalModal onClose={()=>setShowLegal(false)} />}
     </div>
   );
 }
