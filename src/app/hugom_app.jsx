@@ -1311,7 +1311,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
                 </div>
               </div>
               <button style={{...S.btn,background:accent,color:"#fff",boxShadow:`0 4px 14px ${isGomshin?"rgba(233,30,140,.28)":"rgba(49,130,246,.28)"}`}} onClick={sendRequest}>
-                {found.name}님{isGomshin?"의 군화와":"에게"} 연결 요청
+                {found.name}님{isGomshin?"의 군화와":"에게"} 연결하기
               </button>
             </div>
           )}
