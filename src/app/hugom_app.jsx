@@ -259,7 +259,7 @@ export default function App() {
             perf_cycle_weeks: data.perf_cycle_weeks || null,
             perf_cycle_days: data.perf_cycle_days || null,
             annual_limits: data.annual_limits || {이등병:null,일병:null,상병:null,병장:null},
-            reward_limit: data.reward_limit || 6,
+            reward_limit: data.reward_limit || {이등병:6,일병:6,상병:6,병장:6},
             missedMonths: data.missed_months || {},
             visitOutCycle: data.visit_out_cycle || null,
             invite_code: data.partner_code,
@@ -422,10 +422,10 @@ export default function App() {
       const used=allLeaves.filter(l=>l.leave_type==="annual").reduce((acc,l)=>acc+diffDays(l.start_date,l.end_date)+1,0);
       if(used>annualLimit) warnings.push(`🌿 연가: ${rankInfo.currentRank} 한도 ${annualLimit}일 → 현재 ${used}일 사용`);
     }
-    const rewardLimit=profile.reward_limit;
+    const rewardLimit=profile.reward_limit?.[rankInfo.currentRank];
     if(rewardLimit){
       const used=allLeaves.filter(l=>l.leave_type==="reward").reduce((acc,l)=>acc+diffDays(l.start_date,l.end_date)+1,0);
-      if(used>rewardLimit) warnings.push(`🏅 포상휴가: 한도 ${rewardLimit}일 → 현재 ${used}일 사용`);
+      if(used>rewardLimit) warnings.push(`🏅 포상휴가: ${rankInfo.currentRank} 한도 ${rewardLimit}일 → 현재 ${used}일 사용`);
     }
     if(profile.perf_cycle_days){
       allLeaves.filter(l=>l.leave_type==="perf").forEach(l=>{
@@ -473,11 +473,11 @@ export default function App() {
       user_id: profile.id,
       event_type: s.event_type,
       event_date: s.event_date,
-      title: s.event_type,
+      title: s.title || s.event_type,
       memo: s.memo || null,
     }).select().single();
     if (!error && data) {
-      setSchedules(prev => [...prev, { id: data.id, event_type: data.event_type, event_date: data.event_date, memo: data.memo }]);
+      setSchedules(prev => [...prev, { id: data.id, event_type: data.event_type, event_date: data.event_date, memo: data.memo, title: data.title }]);
     }
   };
 
@@ -1113,7 +1113,7 @@ function MultiRangePicker({onClose,onDone,leaves,profile}){
   }, [leaves]);
   const limitByType = {
     annual: profile?.annual_limits?.[rankInfo?.currentRank] || null,
-    reward: profile?.reward_limit || null,
+    reward: profile?.reward_limit?.[rankInfo?.currentRank] || null,
     comfort: null,
     perf: profile?.perf_cycle_days || null,
     outing: null,
@@ -1203,7 +1203,7 @@ function LeaveTab({profile,leaves,perfDates,onAddLeave,onDelLeave}){
   const upcoming=leaves.filter(l=>l.end_date>=today).sort((a,b)=>a.start_date.localeCompare(b.start_date));
   const past=leaves.filter(l=>l.end_date<today).sort((a,b)=>b.start_date.localeCompare(a.start_date));
   const annualUsed=usedDays("annual");const annualLimit=profile.annual_limits?.[currentRank];
-  const rewardUsed=usedDays("reward");const rewardLimit=profile.reward_limit;
+  const rewardUsed=usedDays("reward");const rewardLimit=profile.reward_limit?.[currentRank];
   const annualOver=annualLimit&&annualUsed>annualLimit;const rewardOver=rewardLimit&&rewardUsed>rewardLimit;
   return(
     <div style={{padding:"16px 16px 24px",display:"flex",flexDirection:"column",gap:14}}>
@@ -1497,7 +1497,7 @@ function ProfileTab({profile,setProfile,leaves,onReset,setAuthState,setLeaves,se
           !isGomshin&&profile.perf_first_start&&{l:"첫 성과제",v:profile.perf_first_start},
           !isGomshin&&profile.perf_cycle_weeks&&{l:"성과제 주기",v:`${profile.perf_cycle_weeks}주 (${profile.perf_cycle_days}일)`},
           !isGomshin&&profile.visitOutCycle&&{l:"🚗 면회외출 텀",v:`${profile.visitOutCycle}주마다`},
-          !isGomshin&&{l:"포상 한도",v:`${profile.reward_limit}일`},
+          !isGomshin&&{l:"포상 한도",v:profile.reward_limit?.[rankInfo?.currentRank]?`${profile.reward_limit[rankInfo.currentRank]}일 (${rankInfo.currentRank})`:"미설정"},
         ].filter(Boolean).map((r,i,arr)=>(
           <div key={r.l} style={{display:"flex",justifyContent:"space-between",padding:"9px 0",borderBottom:i<arr.length-1?"1px solid #F2F4F6":"none"}}>
             <span style={{fontSize:13,color:"#8B95A1",fontWeight:500}}>{r.l}</span>
@@ -1602,11 +1602,13 @@ function VisitOutSetupInline({profile,setProfile}){
 function AnnualLimitSetupInline({profile,setProfile,rankInfo}){
   const [open,setOpen]=useState(false);
   const [limits,setLimits]=useState({...(profile.annual_limits||{이등병:null,일병:null,상병:null,병장:null})});
-  const [rewardLim,setRewardLim]=useState(String(profile.reward_limit||6));
+  const [rewardLim,setRewardLim]=useState({...(profile.reward_limit||{이등병:6,일병:6,상병:6,병장:6})});
   const save=()=>{
     const parsed={};
     RANK_LABELS.forEach(r=>{parsed[r]=limits[r]?parseInt(limits[r]):null;});
-    setProfile(p=>({...p,annual_limits:parsed,reward_limit:parseInt(rewardLim)||6}));
+    const parsedReward={};
+    RANK_LABELS.forEach(r=>{parsedReward[r]=rewardLim[r]?parseInt(rewardLim[r]):6;});
+    setProfile(p=>({...p,annual_limits:parsed,reward_limit:parsedReward}));
     setOpen(false);
   };
   const hasLimits=Object.values(profile.annual_limits||{}).some(v=>v);
@@ -1628,8 +1630,15 @@ function AnnualLimitSetupInline({profile,setProfile,rankInfo}){
         </div>);
       })}
       <div style={{marginTop:10,marginBottom:12}}>
-        <div style={{fontSize:12,color:"#8B95A1",marginBottom:6}}>🏅 포상휴가 한도</div>
-        <div style={{display:"flex",alignItems:"center",gap:8}}><input style={{...S.input,flex:1,height:38,padding:"8px 12px",fontSize:14}} type="number" value={rewardLim} onChange={e=>setRewardLim(e.target.value)} placeholder="6"/><span style={{fontSize:12,color:"#8B95A1",flexShrink:0}}>일</span></div>
+        <div style={{fontSize:12,color:"#8B95A1",marginBottom:8}}>🏅 계급별 포상휴가 한도</div>
+        {RANK_LABELS.map(r=>{
+          const isCurrent=rankInfo?.currentRank===r;
+          return(<div key={r} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+            <div style={{width:52,height:30,borderRadius:8,background:isCurrent?"#3182F6":"#E8ECF0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:11,fontWeight:700,color:isCurrent?"#fff":"#8B95A1"}}>{r}</span></div>
+            <input style={{...S.input,flex:1,height:38,padding:"8px 12px",fontSize:14}} type="number" min="0" max="30" value={rewardLim[r]||""} onChange={e=>setRewardLim(prev=>({...prev,[r]:e.target.value}))} placeholder="6"/>
+            <span style={{fontSize:12,color:"#8B95A1",flexShrink:0}}>일</span>
+          </div>);
+        })}
       </div>
       <div style={{display:"flex",gap:8}}><button onClick={()=>setOpen(false)} style={{flex:1,padding:10,borderRadius:10,border:"1.5px solid #E8ECF0",background:"#fff",fontSize:13,fontWeight:600,color:"#8B95A1",cursor:"pointer"}}>취소</button><button onClick={save} style={{flex:2,padding:10,borderRadius:10,border:"none",background:"#05C072",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>저장</button></div>
     </div>
