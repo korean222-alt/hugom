@@ -1293,7 +1293,7 @@ function Onboarding({onComplete}){
           </button>
           <button onClick={()=>setUserType("gomshin")} style={{padding:"22px 20px",borderRadius:20,border:"2px solid #F8BBD0",background:"#FFF5F9",cursor:"pointer",textAlign:"left",display:"flex",gap:16,alignItems:"flex-start"}}>
             <div style={{width:48,height:48,borderRadius:14,background:"#FFF0F8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,flexShrink:0}}>🧸</div>
-            <div><div style={{fontSize:16,fontWeight:800,color:"#C2185B",marginBottom:4}}>곰신 (기다리는 사람)</div><div style={{fontSize:12,color:"#C2185B",opacity:.7,lineHeight:1.6}}>군화 달력 함께 보기 · 날짜 선택 면회 제안</div></div>
+            <div><div style={{fontSize:16,fontWeight:800,color:"#C2185B",marginBottom:4}}>곰신 (마음을 군대에 보낸 사람)</div><div style={{fontSize:12,color:"#C2185B",opacity:.7,lineHeight:1.6}}>군화 달력 함께 보기 · 날짜 선택 면회 제안</div></div>
           </button>
         </div>
       </div>
