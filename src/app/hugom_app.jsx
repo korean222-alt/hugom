@@ -1937,7 +1937,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
         </div>
       )}
 
-      {showGomshinSuggest&&myBf&&<GomshinSuggestPanel partnerName={myBf.name} onSend={handleGomshinSend} onClose={()=>setShowGomshinSuggest(false)}/>}
+      {showGomshinSuggest&&(myBf||found)&&<GomshinSuggestPanel partnerName={(found||myBf).name} onSend={(type,range)=>onAddNotif({type,text:`${profile.name}님이 제안을 보냈어요 💝`,dateRange:range,recipientId:(found||myBf).id})} onClose={()=>{setShowGomshinSuggest(false);setFound(null);}}/>}
     </div>
   );
 }
