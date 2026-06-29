@@ -321,15 +321,17 @@ export default function App() {
 
   // 파트너 데이터 불러오기 함수
   const loadPartnerData = async (partnerId) => {
-      const [pu, plv, psc, pk] = await Promise.all([
+      const [pu, plv, psc, pk1, pk2] = await Promise.all([
         supabase.from("users").select("*").eq("id", partnerId).single(),
         supabase.from("leaves").select("*").eq("user_id", partnerId).order("start_date"),
         supabase.from("schedules").select("*").eq("user_id", partnerId).order("event_date"),
-        supabase.from("pokes").select("*").eq("receiver_id", partnerId).eq("sender_id", profile.id),
+        supabase.from("pokes").select("*").eq("receiver_id", partnerId).eq("sender_id", profile.id).single(),
+        supabase.from("pokes").select("*").eq("receiver_id", profile.id).eq("sender_id", partnerId).single(),
       ]);
     if (pu.data) {
       const pd = pu.data;
-      const pokeData = pk.data?.[0];
+      const myPokeCount = pk1.data?.count || 0;
+      const theirPokeCount = pk2.data?.count || 0;
       const partnerObj = {
         id: pd.id,
         name: pd.name,
@@ -343,7 +345,7 @@ export default function App() {
         status: "accepted",
         leaves: plv.data ? plv.data.map(l => ({ id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo })) : [],
         schedules: psc.data ? psc.data.map(s => ({ id: s.id, event_type: s.event_type, event_date: s.event_date, memo: s.memo })) : [],
-        pokeCount: pokeData?.count || 0,
+        pokeCount: myPokeCount + theirPokeCount,
       };
       setFriends([partnerObj]);
     }
@@ -389,6 +391,10 @@ export default function App() {
             if (f.id === n.sender_id || f.id === n.receiver_id) {
               // 현재 화면에 표시된 친구(f.id)와 관련된 콕 찌르기 데이터(n)라면 업데이트
               if (n.sender_id === profile.id && n.receiver_id === f.id) {
+                return { ...f, pokeCount: n.count };
+              }
+              if (n.sender_id === f.id && n.receiver_id === profile.id) {
+                // 상대방이 나를 찌른 경우에도 화면 업데이트 (필요시)
                 return { ...f, pokeCount: n.count };
               }
             }
@@ -463,13 +469,13 @@ export default function App() {
   const addSched = async (s) => {
     const { data, error } = await supabase.from("schedules").insert({
       user_id: profile.id,
-      type: s.event_type,
-      date: s.event_date,
+      event_type: s.event_type,
+      event_date: s.event_date,
       title: s.event_type,
       memo: s.memo || null,
     }).select().single();
     if (!error && data) {
-      setSchedules(prev => [...prev, { id: data.id, event_type: data.type, event_date: data.date, memo: data.memo }]);
+      setSchedules(prev => [...prev, { id: data.id, event_type: data.event_type, event_date: data.event_date, memo: data.memo }]);
     }
   };
 
@@ -539,13 +545,14 @@ export default function App() {
           .update({ count: newCount, last_poke_at: new Date().toISOString() })
           .eq("id", myPoke.id);
         if (!error) {
-          // 로컬 상태 즉시 업데이트
+          // 로컬 상태 즉시 업데이트 (내가 보낸 횟수 + 상대방이 보낸 횟수 합계)
+          const theirCount = theirPoke?.count || 0;
           setFriends(f => f.map(friend => 
-            friend.id === recipientId ? {...friend, pokeCount: newCount} : friend
+            friend.id === recipientId ? {...friend, pokeCount: newCount + theirCount} : friend
           ));
           addNotif({
             type: "poke",
-            text: `${profile.name}님이 콕 찌르셨어요! (${newCount}번)`,
+            text: `${profile.name}님이 콕 찌르셨어요! (${newCount + theirCount}번)`,
             recipientId,
           });
         }
@@ -559,8 +566,9 @@ export default function App() {
         });
         if (!error) {
           // 로컬 상태 즉시 업데이트
+          const theirCount = theirPoke?.count || 0;
           setFriends(f => f.map(friend => 
-            friend.id === recipientId ? {...friend, pokeCount: 1} : friend
+            friend.id === recipientId ? {...friend, pokeCount: 1 + theirCount} : friend
           ));
           addNotif({
             type: "poke",
@@ -594,13 +602,14 @@ export default function App() {
         supabase.from("users").delete().eq("id", profile.id),
       ]);
     }
+    await supabase.auth.signOut();
     setProfile(null);
     setLeaves([]);
     setSchedules([]);
     setNotifs([]);
     setFriends([]);
     setViewingFriendId(null);
-    setAuthState("need_onboarding");
+    setAuthState("no_user");
   };
 
   // ── 렌더 분기 ──
@@ -991,6 +1000,7 @@ function GomshinSuggestPanel({partnerName,onSend,onClose}){
   const previewEnd=dateEnd||(dateStart&&hoverKey&&hoverKey>dateStart?hoverKey:null);
   const inRange=k=>dateStart&&previewEnd&&k>dateStart&&k<previewEnd;
   const dateRangeStr=()=>{if(!dateStart)return null;if(!dateEnd||dateStart===dateEnd)return fmtDate(dateStart);return `${fmtDate(dateStart)} ~ ${fmtDate(dateEnd)} (${diffDays(dateStart,dateEnd)+1}일)`;};
+  const canSend = dateStart && dateEnd;
   return(
     <div className="fi" style={{...S.overlay,zIndex:120}} onClick={onClose}>
       <div className="su" style={{...S.sheet,paddingBottom:32}} onClick={e=>e.stopPropagation()}>
@@ -1025,9 +1035,10 @@ function GomshinSuggestPanel({partnerName,onSend,onClose}){
               })}
             </div>
             <div style={{marginTop:16}}>
-              <button onClick={()=>onSend(selectedType,dateRangeStr())} disabled={!dateStart} style={{...S.btn,background:dateStart?cfg.color:"#E8ECF0",color:dateStart?"#fff":"#B0B8C1",boxShadow:dateStart?`0 4px 14px ${cfg.color}44`:"none",cursor:dateStart?"pointer":"default"}}>
-                {cfg.icon} {cfg.label} 보내기{dateStart?` (${dateRangeStr()})`: ""}
+              <button onClick={()=>onSend(selectedType,dateRangeStr())} disabled={!canSend} style={{...S.btn,background:canSend?cfg.color:"#E8ECF0",color:canSend?"#fff":"#B0B8C1",boxShadow:canSend?`0 4px 14px ${cfg.color}44`:"none",cursor:canSend?"pointer":"default"}}>
+                {cfg.icon} {cfg.label} 보내기{canSend?` (${dateRangeStr()})`: ""}
               </button>
+              {!canSend && dateStart && <div style={{fontSize:11,color:"#8B95A1",textAlign:"center",marginTop:8}}>종료일을 선택해주세요</div>}
             </div>
           </div>
         )}
@@ -1050,7 +1061,7 @@ function MultiRangePicker({onClose,onDone}){
   const confirmedEntries=Object.entries(selections).filter(([,s])=>s.start&&s.end);
   const totalDays=confirmedEntries.reduce((acc,[,s])=>acc+diffDays(s.start,s.end)+1,0);
   const canSave=confirmedEntries.length>0;
-  const handleSave=()=>{const arr=confirmedEntries.map(([lt,s])=>({leave_type:lt,start_date:s.start,end_date:s.end,memo:memo.trim()||null}));if(arr.length===0)return;onDone(arr);};
+  const handleSave=()=>{const arr=confirmedEntries.map(([lt,s])=>({leave_type:lt,start_date:s.start,end_date:s.end,memo:memo.trim()||null}));if(arr.length===0)return;onDone(arr);setMemo("");};
   return(
     <div style={{position:"fixed",inset:0,background:"#fff",zIndex:200,display:"flex",flexDirection:"column"}}>
       <div style={{background:`linear-gradient(135deg,${cfg.color}cc,${cfg.color})`,padding:"14px 20px 10px",flexShrink:0}}>
@@ -1337,7 +1348,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
   );
 }
 
-function ProfileTab({profile,setProfile,leaves,onReset,setAuthState}){
+function ProfileTab({profile,setProfile,leaves,onReset,setAuthState,setLeaves,setSchedules,setNotifs,setFriends}){
   const today=toKey(new Date());
   const left=Math.max(0,diffDays(today,profile.discharge));
   const total=diffDays(profile.enlist,profile.discharge);
@@ -1433,7 +1444,7 @@ function ProfileTab({profile,setProfile,leaves,onReset,setAuthState}){
         </button>
         <button onClick={()=>{
           const input=window.prompt("탈퇴하려면 '탈퇴하겠습니다'를 입력하세요");
-          if(input==="탈퇴하겠습니다"){onReset();supabase.auth.signOut();}
+          if(input==="탈퇴하겠습니다"){onReset();}
         }} style={{padding:"4px 10px",borderRadius:8,border:"1px solid #FFD0D0",background:"#FFF0F1",fontSize:11,fontWeight:500,color:"#F04452",cursor:"pointer"}}>
           회원탈퇴
         </button>
@@ -1595,8 +1606,23 @@ function ServiceTimeline({profile,rankInfo,leaves}){
 }
 function SalaryCalc({rankInfo, profile}){
   const [open, setOpen] = useState(false);
-  const [durations, setDurations] = useState({ 이등병: 2, 일병: 6, 상병: 6, 병장: 4 });
   
+  // 프로필의 missedMonths를 반영한 실제 복무 기간 계산
+  const actualDurations = useMemo(() => {
+    const { dur } = calcRankSchedule(profile.enlist, profile.missedMonths);
+    // 병장은 전역일 - 마지막 진급일로 계산
+    const lastPromotion = Object.values(calcRankSchedule(profile.enlist, profile.missedMonths).promotions).pop();
+    const sergeantDur = Math.ceil(diffDays(lastPromotion, profile.discharge) / 30);
+    return { ...dur, 병장: sergeantDur };
+  }, [profile.enlist, profile.missedMonths, profile.discharge]);
+
+  const [durations, setDurations] = useState(actualDurations);
+  
+  // durations가 props(profile) 변경 시 업데이트되도록 보정
+  useEffect(() => {
+    setDurations(actualDurations);
+  }, [actualDurations]);
+
   const totalSalary = useMemo(() => {
     let total = 0;
     RANK_LABELS.forEach(r => {
