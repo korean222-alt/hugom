@@ -495,60 +495,82 @@ export default function App() {
   const poke = async (recipientId) => {
     if (!profile?.id || !recipientId) return;
     
-    // 1. 내가 상대방을 찌른 기록 확인
-    const { data: myPoke } = await supabase
-      .from("pokes")
-      .select("*")
-      .eq("sender_id", profile.id)
-      .eq("receiver_id", recipientId)
-      .single();
-    
-    // 2. 상대방이 나를 찌른 기록 확인
-    const { data: theirPoke } = await supabase
-      .from("pokes")
-      .select("*")
-      .eq("sender_id", recipientId)
-      .eq("receiver_id", profile.id)
-      .single();
-
-    // 페이스북 스타일: 내가 이미 찔렀고 상대방이 아직 안 찔렀으면 못 찌름
-    // 또는 내가 찔렀는데 상대방이 그 이후에 찌르지 않았으면 못 찌름
-    if (myPoke) {
-      // 내가 찌른 시간과 상대방이 찌른 시간 비교
-      if (!theirPoke || new Date(myPoke.last_poke_at) > new Date(theirPoke.last_poke_at)) {
-        alert("상대방이 콕 찌를 때까지 기다려주세요! ⏳");
-        return;
-      }
-    }
-    
-    if (myPoke) {
-      // 이미 찌른 기록이 있으면 횟수 업데이트
-      const { error } = await supabase
+    try {
+      // 1. 내가 상대방을 찌른 기록 확인
+      const { data: myPoke } = await supabase
         .from("pokes")
-        .update({ count: myPoke.count + 1, last_poke_at: new Date() })
-        .eq("id", myPoke.id);
-      if (!error) {
-        addNotif({
-          type: "poke",
-          text: `${profile.name}님이 콕 찌르셨어요! (${myPoke.count + 1}번)`,
-          recipientId,
-        });
+        .select("*")
+        .eq("sender_id", profile.id)
+        .eq("receiver_id", recipientId)
+        .single();
+      
+      // 2. 상대방이 나를 찌른 기록 확인
+      const { data: theirPoke } = await supabase
+        .from("pokes")
+        .select("*")
+        .eq("sender_id", recipientId)
+        .eq("receiver_id", profile.id)
+        .single();
+
+      // 페이스북 스타일: 내가 이미 찔렀고 상대방이 아직 안 찔렀으면 못 찌름
+      if (myPoke) {
+        if (!theirPoke) {
+          // 상대방이 한 번도 안 찔렀으면 못 찌름
+          alert("상대방이 콕 찌를 때까지 기다려주세요! ⏳");
+          return;
+        }
+        // 내 마지막 찌른 시간과 상대방 마지막 찌른 시간 비교
+        const myLastTime = new Date(myPoke.last_poke_at).getTime();
+        const theirLastTime = new Date(theirPoke.last_poke_at).getTime();
+        if (myLastTime > theirLastTime) {
+          // 내가 더 최근에 찔렀으면 못 찌름
+          alert("상대방이 콕 찌를 때까지 기다려주세요! ⏳");
+          return;
+        }
       }
-    } else {
-      // 처음 찌르는 경우
-      const { error } = await supabase.from("pokes").insert({
-        sender_id: profile.id,
-        receiver_id: recipientId,
-        count: 1,
-        last_poke_at: new Date(),
-      });
-      if (!error) {
-        addNotif({
-          type: "poke",
-          text: `${profile.name}님이 콕 찌르셨어요!`,
-          recipientId,
+      
+      // 콕 찌르기 실행
+      if (myPoke) {
+        // 이미 찌른 기록이 있으면 횟수 업데이트
+        const newCount = myPoke.count + 1;
+        const { error } = await supabase
+          .from("pokes")
+          .update({ count: newCount, last_poke_at: new Date().toISOString() })
+          .eq("id", myPoke.id);
+        if (!error) {
+          // 로컬 상태 즉시 업데이트
+          setFriends(f => f.map(friend => 
+            friend.id === recipientId ? {...friend, pokeCount: newCount} : friend
+          ));
+          addNotif({
+            type: "poke",
+            text: `${profile.name}님이 콕 찌르셨어요! (${newCount}번)`,
+            recipientId,
+          });
+        }
+      } else {
+        // 처음 찌르는 경우
+        const { error } = await supabase.from("pokes").insert({
+          sender_id: profile.id,
+          receiver_id: recipientId,
+          count: 1,
+          last_poke_at: new Date().toISOString(),
         });
+        if (!error) {
+          // 로컬 상태 즉시 업데이트
+          setFriends(f => f.map(friend => 
+            friend.id === recipientId ? {...friend, pokeCount: 1} : friend
+          ));
+          addNotif({
+            type: "poke",
+            text: `${profile.name}님이 콕 찌르셨어요!`,
+            recipientId,
+          });
+        }
       }
+    } catch (err) {
+      console.error("콕 찌르기 오류:", err);
+      alert("콕 찌르기 중 오류가 발생했습니다.");
     }
   };
 
@@ -1212,37 +1234,30 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
             {accepted.length>0
               ? accepted.map(f=>(
                 <div key={f.id} style={{display:"flex",flexDirection:"column",gap:0}}>
-                  <div onClick={()=>setExpandedFriendId(expandedFriendId===f.id?null:f.id)} style={{...S.card,display:"flex",alignItems:"center",gap:12,cursor:"pointer",borderRadius:expandedFriendId===f.id?"16px 16px 0 0":"16px",transition:"all 0.2s"}}>
-                    <div style={{width:44,height:44,borderRadius:14,background:"#F2F4F6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>
+                  <div onClick={()=>setExpandedFriendId(expandedFriendId===f.id?null:f.id)} style={{...S.card,display:"flex",alignItems:"center",gap:12,cursor:"pointer",borderRadius:expandedFriendId===f.id?"16px 16px 0 0":"16px",transition:"all 0.2s",marginBottom:0}}>
+                    <div style={{width:40,height:40,borderRadius:12,background:"#F2F4F6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
                       {f.userType==="soldier"?"🪖":"💝"}
                     </div>
                     <div style={{flex:1}}>
-                      <div style={{fontSize:15,fontWeight:700,color:"#191F28"}}>{f.name}</div>
-                      <div style={{fontSize:12,color:"#8B95A1",marginTop:2}}>
+                      <div style={{fontSize:14,fontWeight:700,color:"#191F28"}}>{f.name}</div>
+                      <div style={{fontSize:11,color:"#8B95A1",marginTop:1}}>
                         {f.userType==="soldier"?`D-${Math.max(0,diffDays(today,f.discharge))}일 전역까지`:"연결된 친구"}
                       </div>
                     </div>
-                    <div style={{display:"flex",gap:6}}>
-                      <button onClick={(e)=>{e.stopPropagation();onViewFriendCal(f.id);}} style={{padding:"8px 12px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>📅 달력</button>
-                      <button onClick={(e)=>{e.stopPropagation();if(window.confirm("파트너 연결을 해제할까요?"))onDisconnect();}} style={{padding:"8px 10px",background:"#FFF0F1",color:"#F04452",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer"}}>연결해제</button>
-                    </div>
+                    <div style={{fontSize:18,color:"#8B95A1",transition:"transform 0.2s",transform:expandedFriendId===f.id?"rotate(180deg)":"rotate(0deg)"}}>▼</div>
                   </div>
                   {expandedFriendId===f.id&&(
-                    <div style={{background:"#F9FAFB",borderRadius:"0 0 16px 16px",padding:"12px 16px",display:"flex",flexDirection:"column",gap:10,borderLeft:"1px solid #E8ECF0",borderRight:"1px solid #E8ECF0",borderBottom:"1px solid #E8ECF0"}}>
-                      {/* 군화 전용 제안 버튼 */}
-                      <div>
-                        <div style={{fontSize:12,fontWeight:700,color:"#3182F6",marginBottom:8}}>✈️ 휴가/면회 같이 쓰자고 제안하기</div>
-                        <button onClick={()=>{setFound(f);setShowGomshinSuggest(true);}} style={{...S.btn,background:"#3182F6",color:"#fff",padding:"10px",fontSize:14,width:"100%"}}>💌 날짜 선택해서 제안 보내기</button>
-                      </div>
+                    <div style={{background:"#F9FAFB",borderRadius:"0 0 16px 16px",padding:"10px 14px",display:"flex",flexDirection:"column",gap:8,borderLeft:"1px solid #E8ECF0",borderRight:"1px solid #E8ECF0",borderBottom:"1px solid #E8ECF0"}}>
+                      {/* 달력 버튼 */}
+                      <button onClick={()=>onViewFriendCal(f.id)} style={{padding:"8px 12px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>📅 파트너 달력</button>
+                      {/* 휴가/면회 제안 버튼 */}
+                      <button onClick={()=>{setFound(f);setShowGomshinSuggest(true);}} style={{padding:"8px 12px",background:"#3182F6",color:"#fff",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>💌 휴가/면회 제안</button>
                       {/* 콕 찌르기 버튼 */}
-                      <div>
-                        <div style={{fontSize:12,fontWeight:700,color:"#E65100",marginBottom:8}}>👋 콕 찌르기</div>
-                        <button onClick={()=>onPoke(f.id)} style={{...S.btn,background:"linear-gradient(135deg,#FF9500,#FF6B00)",color:"#fff",padding:"10px",fontSize:14,width:"100%"}}>👉 콕 찌르기{f.pokeCount>0?` (${f.pokeCount}번)`:""}</button>
-                      </div>
+                      <button onClick={()=>onPoke(f.id)} style={{padding:"8px 12px",background:"linear-gradient(135deg,#FF9500,#FF6B00)",color:"#fff",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>👉 콕 찌르기{f.pokeCount>0?` (${f.pokeCount}번)`:""}</button>
+                      {/* 연결해제 버튼 */}
+                      <button onClick={()=>{if(window.confirm("파트너 연결을 해제할까요?"))onDisconnect();}} style={{padding:"8px 12px",background:"#FFF0F1",color:"#F04452",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>연결해제</button>
                     </div>
-                  )}
-                </div>
-              ))
+                  )
               : (
                 <div style={{textAlign:"center",padding:"60px 0",color:"#B0B8C1"}}>
                   <div style={{fontSize:40,marginBottom:12}}>👥</div>
