@@ -675,7 +675,7 @@ export default function App() {
         const { data, error } = await supabase
           .from("users")
           .select("*")
-          .eq("kakao_id", user.id)
+          .or(`kakao_id.eq.${user.id},id.eq.${user.id}`) // id(UUID) 또는 kakao_id(기존 저장된 UID) 둘 다 확인
           .single();
 
         if (data && !error) {
@@ -1086,7 +1086,8 @@ export default function App() {
     <Onboarding onComplete={async (profileData) => {
       const { data: { user } } = await supabase.auth.getUser();
       const { data, error } = await supabase.from("users").insert({
-        kakao_id: user.id, // Supabase Auth의 UID를 저장 (카카오/구글 공통)
+        id: user.id, // Supabase Auth의 UID를 직접 id(Primary Key)로 사용
+        kakao_id: user.id, // 하위 호환성을 위해 유지
         role: profileData.userType === "gomshin" ? "gomshin" : "soldier",
         name: profileData.name,
         enlist_date: profileData.enlist,
@@ -1753,7 +1754,7 @@ function LeaveCard({leave,onDelete,past}){
 }
 
 // ===================== 친구 탭 (데모 로직 삭제, 실제 DB 연동만 유지) =====================
-function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal,onAddNotif,onDisconnect,onPoke}){
+function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal,onAddNotif,onDisconnect,onPoke,onAccept}){
   const [subTab,setSubTab]=useState("list");
   const [code,setCode]=useState("");
   const [found,setFound]=useState(null);
@@ -1783,6 +1784,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
   // 연결 요청 — 알림으로 상대방에게 요청 전송 (수락 대기)
   const sendRequest=async()=>{
     if(!found||!profile?.id)return;
+    if(found.id === profile.id) { showToast("자기 자신은 추가할 수 없어요"); return; }
     // 상대방에게 연결 요청 알림 전송
     if(onAddNotif) {
       const msg = isGomshin ? `${profile.name}님의 군화가 연결을 요청했습니다.` : `${profile.name}님이 연결을 요청했습니다.`;
