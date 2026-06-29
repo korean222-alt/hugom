@@ -167,21 +167,326 @@ function WarnModal({ msg, onClose }) {
 
 // ===================== 랜딩 페이지 (로그인 전) =====================
 function LegalModal({ onClose }) {
+  const [activeTab, setActiveTab] = useState("terms");
+  const today = "2026년 6월 29일";
+ 
+  const Section = ({ title, children }) => (
+    <div style={{marginBottom:20}}>
+      <div style={{fontSize:13,fontWeight:800,color:"#191F28",marginBottom:6,paddingBottom:6,borderBottom:"1px solid #F2F4F6"}}>{title}</div>
+      <div style={{fontSize:12,color:"#4E5968",lineHeight:1.8}}>{children}</div>
+    </div>
+  );
+ 
+  const Li = ({ children }) => (
+    <div style={{display:"flex",gap:6,marginBottom:3}}>
+      <span style={{color:"#8B95A1",flexShrink:0}}>•</span>
+      <span>{children}</span>
+    </div>
+  );
+ 
+  const TABS = [
+    { id:"terms",    label:"이용약관" },
+    { id:"privacy",  label:"개인정보" },
+    { id:"security", label:"보안정책" },
+  ];
+ 
   return (
     <div className="fi" style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
-      <div className="su" style={{background:"#fff",borderRadius:24,width:"100%",maxWidth:400,maxHeight:"80vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{padding:"20px",borderBottom:"1px solid #F2F4F6",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div style={{fontSize:16,fontWeight:800}}>약관 및 방침</div>
-          <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer"}}>✕</button>
+      <div className="su" style={{background:"#fff",borderRadius:24,width:"100%",maxWidth:400,maxHeight:"88vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+ 
+        {/* 헤더 */}
+        <div style={{padding:"18px 20px 0",borderBottom:"1px solid #F2F4F6",flexShrink:0}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:18}}>🐻</span>
+              <span style={{fontSize:16,fontWeight:800}}>휴곰 약관 및 방침</span>
+            </div>
+            <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#8B95A1"}}>✕</button>
+          </div>
+          {/* 탭 */}
+          <div style={{display:"flex",gap:0}}>
+            {TABS.map(t=>(
+              <button key={t.id} onClick={()=>setActiveTab(t.id)} style={{flex:1,padding:"10px 4px",fontSize:11,fontWeight:700,border:"none",background:"none",cursor:"pointer",color:activeTab===t.id?"#3182F6":"#B0B8C1",borderBottom:`2px solid ${activeTab===t.id?"#3182F6":"transparent"}`,transition:"all .15s"}}>
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
-        <div style={{padding:"20px",overflowY:"auto",fontSize:13,lineHeight:1.6,color:"#4E5968"}}>
-          <div style={{fontWeight:800,marginBottom:8,color:"#191F28"}}>1. 이용약관</div>
-          <div style={{marginBottom:16}}>본 서비스는 군사보안법 준수를 최우선으로 합니다. 부대 위치, 작전 등 안보 위해 정보를 입력할 수 없으며, 위반 시 모든 책임은 사용자에게 있습니다.</div>
-          <div style={{fontWeight:800,marginBottom:8,color:"#191F28"}}>2. 개인정보처리방침</div>
-          <div style={{marginBottom:16}}>카카오 식별자와 군 복무 정보(입대일 등)를 서비스 제공 목적으로만 수집하며, 탈퇴 시 즉시 파기합니다.</div>
-          <div style={{fontSize:11,color:"#B0B8C1",textAlign:"center"}}>상세 내용은 LEGAL.md를 참조하세요</div>
+ 
+        {/* 본문 */}
+        <div style={{flex:1,overflowY:"auto",padding:"20px"}}>
+ 
+          {/* ══════════════ 이용약관 ══════════════ */}
+          {activeTab==="terms"&&(
+            <div>
+              <div style={{fontSize:11,color:"#B0B8C1",marginBottom:16}}>시행일: {today} · 최종 수정: {today}</div>
+ 
+              <Section title="제1조 (목적)">
+                본 이용약관은 휴곰(이하 "서비스")이 제공하는 군 휴가 관리 웹 애플리케이션 서비스의 이용 조건 및 절차, 서비스 제공자와 이용자의 권리·의무 및 책임사항을 규정함을 목적으로 합니다.
+              </Section>
+ 
+              <Section title="제2조 (정의)">
+                <Li>"서비스"란 휴곰이 운영하는 웹 기반 군 휴가 관리 플랫폼을 의미합니다.</Li>
+                <Li>"이용자"란 본 약관에 동의하고 서비스를 이용하는 군인 및 그 가족·지인을 의미합니다.</Li>
+                <Li>"군화"란 현역 복무 중인 군인 이용자를 의미합니다.</Li>
+                <Li>"곰신"이란 군인의 복무를 기다리는 가족·연인 등 이용자를 의미합니다.</Li>
+              </Section>
+ 
+              <Section title="제3조 (약관의 효력 및 변경)">
+                <Li>본 약관은 서비스 화면에 게시하거나 이메일 등으로 이용자에게 공지함으로써 효력이 발생합니다.</Li>
+                <Li>서비스는 관련 법령을 위배하지 않는 범위에서 약관을 변경할 수 있으며, 변경 시 적용일 7일 전에 공지합니다.</Li>
+                <Li>이용자가 변경된 약관에 동의하지 않을 경우 서비스 이용을 중단하고 탈퇴할 수 있습니다.</Li>
+              </Section>
+ 
+              <Section title="제4조 (서비스 이용)">
+                <Li>서비스는 만 14세 이상 이용자를 대상으로 합니다.</Li>
+                <Li>카카오 소셜 로그인을 통해 가입하며, 별도의 회원가입 절차 없이 서비스를 이용할 수 있습니다.</Li>
+                <Li>서비스는 현재 베타 테스트 기간으로, 기능이 변경되거나 일시 중단될 수 있습니다.</Li>
+                <Li>서비스 이용은 무료이며, 향후 유료 기능 도입 시 사전 고지합니다.</Li>
+              </Section>
+ 
+              <Section title="제5조 (이용자 의무)">
+                이용자는 다음 행위를 하여서는 안 됩니다.
+                <div style={{marginTop:6}}>
+                  <Li>군사기밀, 부대 위치, 작전 계획, 병력 현황 등 군사보안법 위반 정보 입력</Li>
+                  <Li>타인의 개인정보를 도용하거나 허위 정보를 입력하는 행위</Li>
+                  <Li>서비스의 정상적인 운영을 방해하는 행위 (해킹, 악성코드 배포 등)</Li>
+                  <Li>타인의 명예를 훼손하거나 불법적인 정보를 유포하는 행위</Li>
+                  <Li>상업적 목적으로 서비스를 무단 이용하는 행위</Li>
+                </div>
+              </Section>
+ 
+              <Section title="제6조 (군사보안 준수 의무)">
+                <div style={{background:"#FFF0F1",borderRadius:10,padding:"10px 12px",border:"1px solid #FFD0D0",marginBottom:8}}>
+                  <div style={{fontSize:12,fontWeight:800,color:"#F04452",marginBottom:4}}>⚠️ 중요 — 법적 책임 고지</div>
+                  <div style={{fontSize:11,color:"#5D4037",lineHeight:1.7}}>
+                    군사기밀보호법, 군사보안업무훈령 등 관련 법령에 따라 군사보안 관련 정보(훈련 일정, 부대 위치, 작전 계획 등)를 무단으로 기록·유포하는 행위는 형사처벌 대상이 됩니다. 위반 내용 발견 시 즉시 삭제 조치되며, 모든 법적 책임은 작성자 본인에게 있습니다.
+                  </div>
+                </div>
+              </Section>
+ 
+              <Section title="제7조 (서비스 중단 및 제한)">
+                <Li>서비스는 시스템 점검, 장애, 천재지변 등의 사유로 일시 중단될 수 있습니다.</Li>
+                <Li>이용약관 위반 시 사전 통보 없이 서비스 이용을 제한하거나 계정을 삭제할 수 있습니다.</Li>
+                <Li>베타 서비스 종료 시 30일 전 사전 고지합니다.</Li>
+              </Section>
+ 
+              <Section title="제8조 (면책조항)">
+                <Li>서비스는 이용자가 등록한 정보의 정확성, 완전성에 대해 보증하지 않습니다.</Li>
+                <Li>이용자 간 분쟁이 발생한 경우 서비스는 이에 개입하지 않으며, 손해에 대한 책임을 지지 않습니다.</Li>
+                <Li>계급 자동 계산 등의 기능은 참고용이며, 실제 인사 발령과 다를 수 있습니다.</Li>
+                <Li>네트워크 장애, 천재지변 등 불가항력적 사유로 인한 손해에 대해 책임지지 않습니다.</Li>
+              </Section>
+ 
+              <Section title="제9조 (광고 및 수익화)">
+                <Li>서비스는 향후 Google AdSense 등 광고 네트워크를 통해 광고를 게재할 수 있습니다.</Li>
+                <Li>광고 게재 시 이용자에게 사전 공지하며, 광고주의 외부 사이트로 이동 시 해당 사이트의 약관이 적용됩니다.</Li>
+                <Li>광고 클릭 및 외부 링크 이동으로 인한 손해에 대해 서비스는 책임지지 않습니다.</Li>
+                <Li>인앱 결제 또는 프리미엄 기능 도입 시 별도 안내 후 적용합니다.</Li>
+              </Section>
+ 
+              <Section title="제10조 (지식재산권)">
+                <Li>서비스 내 모든 콘텐츠(로고, 디자인, 코드 등)의 지식재산권은 휴곰 운영팀에 귀속됩니다.</Li>
+                <Li>이용자는 서비스를 개인적, 비상업적 목적으로만 이용할 수 있습니다.</Li>
+                <Li>이용자가 직접 입력한 데이터의 권리는 해당 이용자에게 있으며, 서비스는 이를 서비스 제공 외 목적으로 사용하지 않습니다.</Li>
+                <Li>서비스의 소스코드, UI 디자인을 무단으로 복제·배포하는 행위를 금지합니다.</Li>
+              </Section>
+ 
+              <Section title="제11조 (앱 마켓 이용)">
+                <Li>Apple App Store 또는 Google Play를 통해 앱을 설치한 경우, 해당 마켓의 이용약관이 추가로 적용됩니다.</Li>
+                <Li>앱 내 결제는 각 마켓의 결제 시스템을 통해 이루어지며, 환불 정책은 해당 마켓 정책을 따릅니다.</Li>
+                <Li>앱 업데이트는 마켓을 통해 제공되며, 구버전 사용으로 인한 문제에 대해 책임지지 않습니다.</Li>
+              </Section>
+ 
+              <Section title="제12조 (준거법 및 관할법원)">
+                본 약관은 대한민국 법률에 따라 해석되며, 서비스 이용과 관련한 분쟁은 대한민국 법원을 관할 법원으로 합니다.
+              </Section>
+            </div>
+          )}
+ 
+          {/* ══════════════ 개인정보처리방침 ══════════════ */}
+          {activeTab==="privacy"&&(
+            <div>
+              <div style={{fontSize:11,color:"#B0B8C1",marginBottom:16}}>시행일: {today} · 최종 수정: {today}</div>
+ 
+              <div style={{background:"#EBF3FF",borderRadius:10,padding:"10px 12px",border:"1px solid #A5C9FF",marginBottom:16,fontSize:11,color:"#3182F6",lineHeight:1.7,fontWeight:600}}>
+                휴곰은 개인정보보호법, 정보통신망 이용촉진 및 정보보호 등에 관한 법률을 준수합니다.
+              </div>
+ 
+              <Section title="1. 수집하는 개인정보 항목">
+                <div style={{fontWeight:700,color:"#191F28",marginBottom:4}}>① 카카오 로그인 시 자동 수집</div>
+                <Li>카카오 고유 식별자 (kakao_id)</Li>
+                <Li>닉네임 (카카오 프로필)</Li>
+                <Li>프로필 사진 (카카오 프로필)</Li>
+                <div style={{fontWeight:700,color:"#191F28",margin:"8px 0 4px"}}>② 이용자가 직접 입력</div>
+                <Li>이름 (실명 또는 별명)</Li>
+                <Li>입대일 및 전역 예정일</Li>
+                <Li>현재 계급 및 복무 정보</Li>
+                <Li>휴가 사용 내역 (연가, 포상휴가 등)</Li>
+                <Li>일정 및 메모 내용</Li>
+                <div style={{fontWeight:700,color:"#191F28",margin:"8px 0 4px"}}>③ 서비스 이용 중 자동 생성</div>
+                <Li>파트너 연결 코드 및 연결 정보</Li>
+                <Li>알림 내역</Li>
+                <Li>서비스 접속 기록 (Supabase 자동 기록)</Li>
+              </Section>
+ 
+              <Section title="2. 개인정보 수집 목적">
+                <Li>서비스 회원 식별 및 로그인 인증</Li>
+                <Li>군 휴가 관리 및 계급 자동 계산 기능 제공</Li>
+                <Li>파트너(군화↔곰신) 연결 및 일정 공유 기능 제공</Li>
+                <Li>알림 전송 및 서비스 이용 지원</Li>
+                <Li>서비스 개선 및 신규 기능 개발</Li>
+              </Section>
+ 
+              <Section title="3. 개인정보 보유 및 이용 기간">
+                <Li>회원 탈퇴 즉시 모든 개인정보 삭제</Li>
+                <Li>법령에 의한 보존 의무가 있는 경우 해당 기간 동안 보관</Li>
+                <Li>서비스 미이용 후 1년 경과 시 개인정보 삭제 안내 후 처리</Li>
+                <div style={{background:"#FFF8E8",borderRadius:8,padding:"8px 10px",marginTop:8,border:"1px solid #FFDB9A",fontSize:11,color:"#5D4037"}}>
+                  ※ 관계 법령에 따른 보존 기간: 전자상거래 등에서의 소비자보호에 관한 법률에 따라 계약·청약 철회 기록은 5년, 불만·분쟁 처리 기록은 3년 보존할 수 있습니다.
+                </div>
+              </Section>
+ 
+              <Section title="4. 개인정보 제3자 제공">
+                <div style={{fontWeight:700,color:"#05C072",marginBottom:6}}>✓ 원칙적으로 제3자에게 개인정보를 제공하지 않습니다.</div>
+                단, 다음의 경우에는 예외로 합니다.
+                <Li>이용자가 직접 동의한 경우 (파트너 연결 시 상대방과 정보 공유)</Li>
+                <Li>법령의 규정에 의거하거나 수사기관의 적법한 요청이 있는 경우</Li>
+              </Section>
+ 
+              <Section title="5. 개인정보 처리 위탁">
+                <div style={{fontWeight:700,color:"#191F28",marginBottom:6}}>서비스 운영을 위해 아래 업체에 처리를 위탁합니다.</div>
+                <div style={{background:"#F9FAFB",borderRadius:8,padding:"10px 12px",border:"1px solid #E8ECF0"}}>
+                  <div style={{marginBottom:6}}><span style={{fontWeight:700}}>Supabase Inc.</span> — 데이터베이스 및 인증 서버 운영 (미국)</div>
+                  <div style={{marginBottom:6}}><span style={{fontWeight:700}}>Vercel Inc.</span> — 웹 서버 호스팅 (미국)</div>
+                  <div><span style={{fontWeight:700}}>카카오(주)</span> — 소셜 로그인 인증</div>
+                </div>
+                <div style={{marginTop:8,fontSize:11,color:"#8B95A1"}}>※ 국외 이전: Supabase(미국), Vercel(미국)은 개인정보보호법 제28조의8에 따라 국외로 개인정보가 이전될 수 있습니다.</div>
+              </Section>
+ 
+              <Section title="6. 이용자의 권리">
+                이용자는 언제든지 다음 권리를 행사할 수 있습니다.
+                <Li>개인정보 열람 요청</Li>
+                <Li>개인정보 정정·삭제 요청</Li>
+                <Li>개인정보 처리 정지 요청</Li>
+                <Li>회원 탈퇴 (앱 내 '내 정보 → 회원탈퇴')</Li>
+                <div style={{marginTop:6,color:"#8B95A1",fontSize:11}}>※ 권리 행사는 앱 내 피드백 기능으로 요청할 수 있으며, 10일 이내에 처리합니다.</div>
+              </Section>
+ 
+              <Section title="7. 개인정보 보호책임자">
+                <div style={{background:"#F9FAFB",borderRadius:8,padding:"10px 12px",border:"1px solid #E8ECF0"}}>
+                  <div><span style={{fontWeight:700}}>성명:</span> 휴곰 운영팀</div>
+                  <div style={{marginTop:4}}><span style={{fontWeight:700}}>문의:</span> 앱 내 '피드백 보내기' 이용</div>
+                </div>
+              </Section>
+ 
+              <Section title="8. 쿠키 및 자동 수집">
+                <Li>서비스는 Supabase 인증을 위해 로컬 스토리지에 세션 정보를 저장합니다.</Li>
+                <Li>광고 목적의 쿠키는 현재 수집하지 않습니다.</Li>
+                <Li>브라우저 설정을 통해 세션 정보를 직접 삭제할 수 있습니다.</Li>
+              </Section>
+ 
+              <Section title="9. 광고 서비스 관련 개인정보">
+                <div style={{background:"#FFF8E8",borderRadius:8,padding:"8px 10px",marginBottom:8,border:"1px solid #FFDB9A",fontSize:11,color:"#5D4037"}}>
+                  향후 Google AdSense 등 광고 서비스 도입 시 아래 내용이 적용됩니다.
+                </div>
+                <Li>Google AdSense는 관심 기반 광고 제공을 위해 쿠키를 사용할 수 있습니다.</Li>
+                <Li>광고 쿠키를 통해 수집된 정보는 Google의 개인정보처리방침을 따릅니다.</Li>
+                <Li>이용자는 Google 광고 설정(g.co/adsettings)에서 맞춤 광고를 거부할 수 있습니다.</Li>
+                <Li>광고 도입 시 별도 동의 절차를 진행합니다.</Li>
+              </Section>
+ 
+              <Section title="10. 아동 개인정보 보호">
+                <Li>본 서비스는 만 14세 미만 아동을 대상으로 하지 않습니다.</Li>
+                <Li>만 14세 미만 이용자의 개인정보가 수집된 사실을 인지한 경우 즉시 삭제 조치합니다.</Li>
+                <Li>만 14세 미만 아동의 서비스 이용이 확인될 경우 법정대리인의 동의 없이 수집된 정보는 지체 없이 파기합니다.</Li>
+                <Li>아동 개인정보 관련 문의는 앱 내 피드백 기능을 통해 연락해 주세요.</Li>
+              </Section>
+ 
+              <Section title="11. 개인정보처리방침 변경">
+                <Li>본 방침은 법령·정책 변경 또는 서비스 변경 시 개정될 수 있습니다.</Li>
+                <Li>중요한 변경사항 발생 시 시행 7일 전 앱 내 공지합니다.</Li>
+                <Li>이용자는 개정된 방침에 동의하지 않을 경우 서비스 탈퇴로 동의를 거부할 수 있습니다.</Li>
+                <Li>방침 변경 후 계속 서비스를 이용하는 경우 변경된 방침에 동의한 것으로 간주합니다.</Li>
+              </Section>
+            </div>
+          )}
+ 
+          {/* ══════════════ 보안정책 ══════════════ */}
+          {activeTab==="security"&&(
+            <div>
+              <div style={{fontSize:11,color:"#B0B8C1",marginBottom:16}}>시행일: {today}</div>
+ 
+              <div style={{background:"#FFF0F1",borderRadius:10,padding:"12px 14px",border:"1px solid #FFD0D0",marginBottom:16}}>
+                <div style={{fontSize:13,fontWeight:800,color:"#F04452",marginBottom:6}}>⚠️ 군사보안 위반 시 법적 제재 안내</div>
+                <div style={{fontSize:11,color:"#5D4037",lineHeight:1.8}}>
+                  군사기밀보호법 제12조, 군사보안업무훈령에 따라 군사보안 관련 정보를 무단으로 기록·유포할 경우 <span style={{fontWeight:800}}>7년 이하의 징역 또는 7천만원 이하의 벌금</span>에 처해질 수 있습니다.
+                </div>
+              </div>
+ 
+              <Section title="1. 금지 정보 입력 정책">
+                다음 정보는 절대 입력할 수 없으며, 시스템에 의해 자동 차단됩니다.
+                <div style={{marginTop:8,display:"flex",flexWrap:"wrap",gap:4}}>
+                  {["부대 위치","작전 계획","훈련 일정","병력 현황","무기체계 정보","군사시설 위치","암호·비밀","당직 정보","출동 정보","지휘통제 관련"].map(w=>(
+                    <span key={w} style={{padding:"3px 8px",borderRadius:100,background:"#FFF0F1",border:"1px solid #FFD0D0",fontSize:10,fontWeight:700,color:"#F04452"}}>{w}</span>
+                  ))}
+                </div>
+              </Section>
+ 
+              <Section title="2. 자동 필터링 시스템">
+                <Li>100여 개의 군사보안 관련 금칙어 실시간 감지</Li>
+                <Li>공백 삽입 등 우회 시도 자동 탐지 및 차단</Li>
+                <Li>위반 콘텐츠 발견 시 즉시 등록 차단 및 경고 표시</Li>
+                <Li>신고된 콘텐츠는 24시간 내 검토 후 삭제 조치</Li>
+              </Section>
+ 
+              <Section title="3. 데이터 보안">
+                <Li>모든 데이터 전송은 HTTPS(TLS 1.3) 암호화 적용</Li>
+                <Li>Supabase RLS(Row Level Security) 정책으로 본인 데이터만 접근 가능</Li>
+                <Li>파트너 연결 데이터는 연결된 상대방에게만 공개</Li>
+                <Li>비밀번호 없는 소셜 로그인으로 계정 탈취 위험 최소화</Li>
+                <Li>JWT 토큰 기반 인증으로 세션 보안 유지</Li>
+              </Section>
+ 
+              <Section title="4. 이용자 신고 및 처리">
+                <Li>보안 위반 의심 콘텐츠 발견 시 앱 내 피드백으로 신고 가능</Li>
+                <Li>신고 접수 후 48시간 내 처리 결과 안내</Li>
+                <Li>반복 위반 이용자는 영구 이용 제한 조치</Li>
+              </Section>
+ 
+              <Section title="5. 보안 사고 대응">
+                <Li>개인정보 유출 사고 발생 시 72시간 이내 이용자 통지</Li>
+                <Li>개인정보보호위원회에 법정 기한 내 신고</Li>
+                <Li>피해 최소화를 위한 즉각적인 접근 차단 및 복구 조치</Li>
+              </Section>
+ 
+              <Section title="6. 앱스토어 보안 정책 준수">
+                <Li>Apple App Store 심사 지침 및 Google Play 개발자 정책을 준수합니다.</Li>
+                <Li>앱은 사용자 기기의 불필요한 권한을 요청하지 않습니다.</Li>
+                <Li>카메라, 마이크, 위치 정보 등 민감한 권한은 수집하지 않습니다.</Li>
+                <Li>앱 내 외부 링크 이동 시 이용자에게 외부 페이지임을 명확히 안내합니다.</Li>
+              </Section>
+ 
+              <Section title="7. 광고 보안 정책">
+                <Li>Google AdSense 프로그램 정책을 준수하며, 클릭 어뷰징을 유도하지 않습니다.</Li>
+                <Li>군사보안 관련 페이지에는 광고를 게재하지 않습니다.</Li>
+                <Li>미성년자 대상 콘텐츠 페이지에는 성인 광고를 게재하지 않습니다.</Li>
+                <Li>허위·과장 광고 콘텐츠는 즉시 차단 조치합니다.</Li>
+              </Section>
+ 
+              <div style={{marginTop:4,padding:"12px 14px",background:"#F9FAFB",borderRadius:10,border:"1px solid #E8ECF0",fontSize:11,color:"#8B95A1",lineHeight:1.7}}>
+                보안 취약점 또는 위반 사항 발견 시 앱 내 '피드백 보내기'를 통해 즉시 신고해 주세요. 신속히 조치하겠습니다. 🐻
+              </div>
+            </div>
+          )}
+ 
         </div>
-        <button onClick={onClose} style={{margin:"0 20px 20px",padding:"14px",borderRadius:14,background:"#3182F6",color:"#fff",border:"none",fontWeight:700,cursor:"pointer"}}>확인</button>
+ 
+        {/* 하단 버튼 */}
+        <div style={{padding:"12px 20px 20px",borderTop:"1px solid #F2F4F6",flexShrink:0}}>
+          <button onClick={onClose} style={{...S.btn,background:"#3182F6",color:"#fff",padding:14}}>확인했습니다</button>
+        </div>
+ 
       </div>
     </div>
   );
