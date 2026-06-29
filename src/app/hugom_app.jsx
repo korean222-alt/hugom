@@ -332,10 +332,18 @@ function LegalModal({ onClose }) {
               </div>
  
               <Section title="1. 수집하는 개인정보 항목">
-                <div style={{fontWeight:700,color:"#191F28",marginBottom:4}}>① 카카오 로그인 시 자동 수집</div>
-                <Li>카카오 고유 식별자 (kakao_id)</Li>
+                <div style={{fontWeight:700,color:"#191F28",marginBottom:4}}>① 소셜 로그인 시 자동 수집</div>
+                <div style={{fontSize:11,fontWeight:700,color:"#4E5968",marginTop:6,marginBottom:2}}>[카카오 로그인]</div>
+                <Li>카카오 고유 식별자</Li>
                 <Li>닉네임 (카카오 프로필)</Li>
                 <Li>프로필 사진 (카카오 프로필)</Li>
+                <Li>이메일 주소 (미수집 — 검수 전)</Li>
+
+                <div style={{fontSize:11,fontWeight:700,color:"#4E5968",marginTop:8,marginBottom:2}}>[Google 로그인]</div>
+                <Li>Google 고유 식별자</Li>
+                <Li>이메일 주소</Li>
+                <Li>닉네임 (Google 프로필)</Li>
+                <Li>프로필 사진 (Google 프로필)</Li>
                 <div style={{fontWeight:700,color:"#191F28",margin:"8px 0 4px"}}>② 이용자가 직접 입력</div>
                 <Li>이름 (실명 또는 별명)</Li>
                 <Li>입대일 및 전역 예정일</Li>
@@ -377,7 +385,8 @@ function LegalModal({ onClose }) {
                 <div style={{background:"#F9FAFB",borderRadius:8,padding:"10px 12px",border:"1px solid #E8ECF0"}}>
                   <div style={{marginBottom:6}}><span style={{fontWeight:700}}>Supabase Inc.</span> — 데이터베이스 및 인증 서버 운영 (미국)</div>
                   <div style={{marginBottom:6}}><span style={{fontWeight:700}}>Vercel Inc.</span> — 웹 서버 호스팅 (미국)</div>
-                  <div><span style={{fontWeight:700}}>카카오(주)</span> — 소셜 로그인 인증</div>
+                  <div style={{marginBottom:6}}><span style={{fontWeight:700}}>카카오(주)</span> — 카카오 소셜 로그인 인증</div>
+                  <div><span style={{fontWeight:700}}>Google LLC</span> — Google 소셜 로그인 인증 (미국)</div>
                 </div>
                 <div style={{marginTop:8,fontSize:11,color:"#8B95A1"}}>※ 국외 이전: Supabase(미국), Vercel(미국)은 개인정보보호법 제28조의8에 따라 국외로 개인정보가 이전될 수 있습니다.</div>
               </Section>
