@@ -292,14 +292,14 @@ export default function App() {
     const loadData = async () => {
       const [lv, sc, nt] = await Promise.all([
         supabase.from("leaves").select("*").eq("user_id", profile.id).order("start_date"),
-        supabase.from("schedules").select("*").eq("user_id", profile.id).order("date"),
+        supabase.from("schedules").select("*").eq("user_id", profile.id).order("event_date"),
         supabase.from("notifications").select("*").eq("user_id", profile.id).order("created_at", { ascending: false }),
       ]);
       if (lv.data) setLeaves(lv.data.map(l => ({
         id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo,
       })));
       if (sc.data) setSchedules(sc.data.map(s => ({
-        id: s.id, event_type: s.type, event_date: s.date, memo: s.memo,
+        id: s.id, event_type: s.event_type, event_date: s.event_date, memo: s.memo,
       })));
       if (nt.data) setNotifs(nt.data.map(n => ({
         id: n.id, type: n.message?.type || "info", text: n.message?.text || n.message,
@@ -316,11 +316,11 @@ export default function App() {
 
   // 파트너 데이터 불러오기 함수
   const loadPartnerData = async (partnerId) => {
-    const [pu, plv, psc] = await Promise.all([
-      supabase.from("users").select("*").eq("id", partnerId).single(),
-      supabase.from("leaves").select("*").eq("user_id", partnerId).order("start_date"),
-      supabase.from("schedules").select("*").eq("user_id", partnerId).order("date"),
-    ]);
+      const [pu, plv, psc] = await Promise.all([
+        supabase.from("users").select("*").eq("id", partnerId).single(),
+        supabase.from("leaves").select("*").eq("user_id", partnerId).order("start_date"),
+        supabase.from("schedules").select("*").eq("user_id", partnerId).order("event_date"),
+      ]);
     if (pu.data) {
       const pd = pu.data;
       const partnerObj = {
@@ -335,7 +335,7 @@ export default function App() {
         relation: pd.role === "soldier" ? "my_soldier" : "my_gomshin",
         status: "accepted",
         leaves: plv.data ? plv.data.map(l => ({ id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo })) : [],
-        schedules: psc.data ? psc.data.map(s => ({ id: s.id, event_type: s.type, event_date: s.date, memo: s.memo })) : [],
+        schedules: psc.data ? psc.data.map(s => ({ id: s.id, event_type: s.event_type, event_date: s.event_date, memo: s.memo })) : [],
       };
       setFriends([partnerObj]);
     }
@@ -442,7 +442,7 @@ export default function App() {
 
   const addNotif = async (notif) => {
     const { data, error } = await supabase.from("notifications").insert({
-      user_id: profile.id,
+      user_id: notif.recipientId || profile.id,
       message: { type: notif.type, text: notif.text, dateRange: notif.dateRange || null },
       is_read: false,
     }).select().single();
@@ -1060,7 +1060,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
   const handleGomshinSend=(type,dateRange)=>{
     if(!myBf||!onAddNotif)return;
     const labels={leave_suggest:"🌿 휴가 제안",visit_request:"🏠 영내면회 제안",visit_out_suggest:"🚗 면회외출 제안"};
-    onAddNotif({type,text:`${profile.name}(님이 ${labels[type]}을 보냈어요 💝`,dateRange});
+    onAddNotif({type,text:`${profile.name}님이 ${labels[type]}을 보냈어요 💝`,dateRange,recipientId:myBf.id});
     showToast(`${labels[type]}을 보냈어요!`);
     setShowGomshinSuggest(false);
   };
