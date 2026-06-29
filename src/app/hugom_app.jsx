@@ -316,13 +316,15 @@ export default function App() {
 
   // 파트너 데이터 불러오기 함수
   const loadPartnerData = async (partnerId) => {
-      const [pu, plv, psc] = await Promise.all([
+      const [pu, plv, psc, pk] = await Promise.all([
         supabase.from("users").select("*").eq("id", partnerId).single(),
         supabase.from("leaves").select("*").eq("user_id", partnerId).order("start_date"),
         supabase.from("schedules").select("*").eq("user_id", partnerId).order("event_date"),
+        supabase.from("pokes").select("*").eq("receiver_id", partnerId).eq("sender_id", profile.id),
       ]);
     if (pu.data) {
       const pd = pu.data;
+      const pokeData = pk.data?.[0];
       const partnerObj = {
         id: pd.id,
         name: pd.name,
@@ -336,6 +338,7 @@ export default function App() {
         status: "accepted",
         leaves: plv.data ? plv.data.map(l => ({ id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo })) : [],
         schedules: psc.data ? psc.data.map(s => ({ id: s.id, event_type: s.event_type, event_date: s.event_date, memo: s.memo })) : [],
+        pokeCount: pokeData?.count || 0,
       };
       setFriends([partnerObj]);
     }
@@ -363,7 +366,35 @@ export default function App() {
         }, ...prev]);
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    
+    // Realtime: 콕 찌르기 업데이트 수신
+    const pokeChannel = supabase
+      .channel("poke-updates-" + profile.id)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "pokes",
+      }, (payload) => {
+        const n = payload.new;
+        if (n.sender_id === profile.id || n.receiver_id === profile.id) {
+          setFriends(prev => prev.map(f => {
+            if (f.id === n.sender_id || f.id === n.receiver_id) {
+              const partnerId = f.id;
+              // 내가 보낸 경우 또는 받은 경우 모두 횟수 업데이트
+              if (n.sender_id === profile.id && n.receiver_id === partnerId) {
+                return { ...f, pokeCount: n.count };
+              }
+            }
+            return f;
+          }));
+        }
+      })
+      .subscribe();
+
+    return () => { 
+      supabase.removeChannel(channel); 
+      supabase.removeChannel(pokeChannel);
+    };
   }, [profile?.id]);
 
   const checkLimits=(newLeaves,existingLeaves)=>{
@@ -451,6 +482,63 @@ export default function App() {
         id: data.id, type: notif.type, text: notif.text,
         dateRange: notif.dateRange || null, time: "방금", read: false,
       }, ...prev]);
+    }
+  };
+
+  // 콕 찌르기 함수
+  const poke = async (recipientId) => {
+    if (!profile?.id || !recipientId) return;
+    
+    // 1. 내가 상대방을 찌른 기록 확인
+    const { data: myPoke } = await supabase
+      .from("pokes")
+      .select("*")
+      .eq("sender_id", profile.id)
+      .eq("receiver_id", recipientId)
+      .single();
+    
+    // 2. 상대방이 나를 찌른 기록 확인
+    const { data: theirPoke } = await supabase
+      .from("pokes")
+      .select("*")
+      .eq("sender_id", recipientId)
+      .eq("receiver_id", profile.id)
+      .single();
+
+    // 페이스북 스타일: 내가 이미 찔렀고 상대방이 아직 안 찔렀으면 못 찌름
+    if (myPoke && (!theirPoke || myPoke.last_poke_at > theirPoke.last_poke_at)) {
+      alert("상대방이 콕 찌를 때까지 기다려주세요! ⏳");
+      return;
+    }
+    
+    if (myPoke) {
+      // 이미 찌른 기록이 있으면 횟수 업데이트
+      const { error } = await supabase
+        .from("pokes")
+        .update({ count: myPoke.count + 1, last_poke_at: new Date() })
+        .eq("id", myPoke.id);
+      if (!error) {
+        addNotif({
+          type: "poke",
+          text: `${profile.name}님이 콕 찌르셨어요! (${myPoke.count + 1}번)`,
+          recipientId,
+        });
+      }
+    } else {
+      // 처음 찌르는 경우
+      const { error } = await supabase.from("pokes").insert({
+        sender_id: profile.id,
+        receiver_id: recipientId,
+        count: 1,
+        last_poke_at: new Date(),
+      });
+      if (!error) {
+        addNotif({
+          type: "poke",
+          text: `${profile.name}님이 콕 찌르셨어요!`,
+          recipientId,
+        });
+      }
     }
   };
 
@@ -1095,6 +1183,10 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
               <div style={{fontSize:12,fontWeight:700,color:"#C2185B",marginBottom:10}}>💝 날짜 선택해서 제안하기</div>
               <button onClick={()=>setShowGomshinSuggest(true)} style={{...S.btn,background:"linear-gradient(135deg,#FF4081,#E91E8C)",color:"#fff",boxShadow:"0 4px 14px rgba(233,30,140,.3)"}}>💌 날짜 선택해서 제안 보내기</button>
             </div>
+            <div style={{background:"#FFF8E8",borderRadius:16,padding:"14px 16px",border:"1px solid #FFDB9A"}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#E65100",marginBottom:10}}>👋 콕 찌르기</div>
+              <button onClick={()=>poke(myBf.id)} style={{...S.btn,background:"linear-gradient(135deg,#FF9500,#FF6B00)",color:"#fff",boxShadow:"0 4px 14px rgba(255,107,0,.3)"}}>👉 콕 찌르기{myBf.pokeCount>0?` (${myBf.pokeCount}번)`:""}</button>
+            </div>
           </>)}
           {isGomshin&&!myBf&&(
             <div style={{textAlign:"center",padding:"40px 0",color:"#B0B8C1"}}>
@@ -1128,6 +1220,11 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
                   <div style={{background:"#EBF3FF",borderRadius:16,padding:"12px 14px",border:"1px solid #A5C9FF",marginBottom:10}}>
                     <div style={{fontSize:12,fontWeight:700,color:"#3182F6",marginBottom:8}}>✈️ 휴가/면회 같이 쓰자고 제안하기</div>
                     <button onClick={()=>{setFound(f);setShowGomshinSuggest(true);}} style={{...S.btn,background:"#3182F6",color:"#fff",padding:"10px",fontSize:14}}>💌 날짜 선택해서 제안 보내기</button>
+                  </div>
+                  {/* 콕 찌르기 버튼 */}
+                  <div style={{background:"#FFF8E8",borderRadius:16,padding:"12px 14px",border:"1px solid #FFDB9A"}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#E65100",marginBottom:8}}>👋 콕 찌르기</div>
+                    <button onClick={()=>poke(f.id)} style={{...S.btn,background:"linear-gradient(135deg,#FF9500,#FF6B00)",color:"#fff",padding:"10px",fontSize:14}}>👉 콕 찌르기{f.pokeCount>0?` (${f.pokeCount}번)`:""}</button>
                   </div>
                 </div>
               ))
