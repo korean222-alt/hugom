@@ -1803,16 +1803,28 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
   
 
 
-  const handleGomshinSend=(type,dateRange)=>{
-    if(!myBf||!onAddNotif)return;
-    const labels={leave_suggest:"🌿 휴가 제안",visit_request:"🏠 영내면회 제안",visit_out_suggest:"🚗 면회외출 제안"};
-    const result = await 
-    onAddNotif({type,text:`${profile.name}님이 ${labels[type]}을 보냈어요 💝`,dateRange,recipientId:myBf.id, senderId: profile.id});
-    if (!result?.success) return;
-    
-    showToast(`${labels[type]}을 보냈어요!`);
-    setShowGomshinSuggest(false);
+  const handleGomshinSend = async (type, dateRange) => {
+  if (!myBf || !onAddNotif) return;
+
+  const labels = {
+    leave_suggest: "🌿 휴가 제안",
+    visit_request: "🏠 영내면회 제안",
+    visit_out_suggest: "🚗 면회외출 제안"
   };
+
+  const result = await onAddNotif({
+    type,
+    text: `${profile.name}님이 ${labels[type]}을 보냈어요 💝`,
+    dateRange,
+    recipientId: myBf.id,
+    senderId: profile.id
+  });
+
+  if (!result?.success) return;
+
+  showToast(`${labels[type]}을 보냈어요!`);
+  setShowGomshinSuggest(false);
+};
 
   const accent=isGomshin?"#E91E8C":"#3182F6";
   return(
