@@ -1792,7 +1792,10 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
     // 상대방에게 연결 요청 알림 전송
     if(onAddNotif) {
       const msg = isGomshin ? `${profile.name}님의 군화가 연결을 요청했습니다.` : `${profile.name}님이 연결을 요청했습니다.`;
+      const result = await 
       onAddNotif({type:"connection_request",text:msg,recipientId:found.id,senderId:profile.id});
+      if (!result?.success) return;
+      
     }
     showToast("연결 요청을 보냈어요!");
     setSubTab("list");setCode("");setFound(null);
@@ -1803,7 +1806,10 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
   const handleGomshinSend=(type,dateRange)=>{
     if(!myBf||!onAddNotif)return;
     const labels={leave_suggest:"🌿 휴가 제안",visit_request:"🏠 영내면회 제안",visit_out_suggest:"🚗 면회외출 제안"};
+    const result = await 
     onAddNotif({type,text:`${profile.name}님이 ${labels[type]}을 보냈어요 💝`,dateRange,recipientId:myBf.id, senderId: profile.id});
+    if (!result?.success) return;
+    
     showToast(`${labels[type]}을 보냈어요!`);
     setShowGomshinSuggest(false);
   };
