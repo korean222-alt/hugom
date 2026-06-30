@@ -638,8 +638,8 @@ export default function App() {
   const [friends,setFriends]=useState([]);
   const [showNotif,setShowNotif]=useState(false);
   const [profile,setProfile]=useState(null);
-  const [viewingFriendId,setViewingFriendId]=useState(null);
   const [warnMsg,setWarnMsg]=useState("");
+  const [calView,setCalView]=useState("mine");
   // authState: "loading" | "no_user" | "need_onboarding" | "ready"
   const [authState,setAuthState]=useState("loading");
   const unread=notifs.filter(n=>!n.read).length;
@@ -837,9 +837,28 @@ export default function App() {
       })
       .subscribe((status) => console.log("DEBUG: poke-updates realtime status:", status));
 
+    // Realtime: 내 users 행 UPDATE 감지 (곰신이 수락 받았을 때 partner_id 자동 반영)
+    const profileChannel = supabase
+      .channel("profile-updates-" + profile.id)
+      .on("postgres_changes", {
+        event: "UPDATE", schema: "public", table: "users",
+        filter: `id=eq.${profile.id}`,
+      }, (payload) => {
+        const newPartnerId = payload.new.partner_id;
+        if (newPartnerId && newPartnerId !== profile.partner_id) {
+          setProfile(p => ({ ...p, partner_id: newPartnerId }));
+          loadPartnerData(newPartnerId);
+        } else if (!newPartnerId && profile.partner_id) {
+          setProfile(p => ({ ...p, partner_id: null }));
+          setFriends([]);
+        }
+      })
+      .subscribe((status) => console.log("DEBUG: profile-updates realtime status:", status));
+
     return () => { 
       supabase.removeChannel(channel); 
       supabase.removeChannel(pokeChannel);
+      supabase.removeChannel(profileChannel);
     };
   }, [profile?.id]);
 
@@ -1069,7 +1088,6 @@ export default function App() {
     setSchedules([]);
     setNotifs([]);
     setFriends([]);
-    setViewingFriendId(null);
     setAuthState("no_user");
   };
 
@@ -1115,14 +1133,17 @@ export default function App() {
   );
 
   // 로그인 + 프로필 있음 → 메인 앱
-  const linkedSoldier=profile.userType==="gomshin"?friends.find(f=>f.relation==="my_soldier"&&f.status==="accepted"):null;
-  const viewingFriend=viewingFriendId?friends.find(f=>f.id===viewingFriendId):null;
-  const calLeaves=viewingFriend?(viewingFriend.leaves||[]):linkedSoldier?(linkedSoldier.leaves||[]):leaves;
-  const calSchedules=viewingFriend?(viewingFriend.schedules||[]):linkedSoldier?(linkedSoldier.schedules||[]):schedules;
-  const calOutingDates=viewingFriend?calcOutingDates(viewingFriend.perf_first_start,viewingFriend.perf_cycle_weeks,viewingFriend.perf_cycle_days):linkedSoldier?calcOutingDates(linkedSoldier.perf_first_start,linkedSoldier.perf_cycle_weeks,linkedSoldier.perf_cycle_days):perfDates;
-  const calProfile=viewingFriend?viewingFriend:linkedSoldier?linkedSoldier:profile;
   const isGomshin=profile.userType==="gomshin";
-  const isReadOnly=!!viewingFriend||!!linkedSoldier;
+  const partner=friends.find(f=>f.status==="accepted")||null;
+  // calView: "mine" | "partner" — 곰신/군화 공통으로 토글 가능 (상단 state 선언 참조)
+  const showingPartner=calView==="partner"&&!!partner;
+  const calLeaves=showingPartner?(partner.leaves||[]):leaves;
+  const calSchedules=showingPartner?(partner.schedules||[]):schedules;
+  const calOutingDates=showingPartner
+    ?calcOutingDates(partner.perf_first_start,partner.perf_cycle_weeks,partner.perf_cycle_days)
+    :perfDates;
+  const calProfile=showingPartner?partner:profile;
+  const isReadOnly=showingPartner;
   const tabs=isGomshin
     ?[{id:"cal",icon:"📅",label:"달력"},{id:"friends",icon:"💝",label:"연결"},{id:"profile",icon:"⚙️",label:"내 정보"}]
     :[{id:"cal",icon:"📅",label:"달력"},{id:"leave",icon:"🏖️",label:"휴가"},{id:"friends",icon:"👥",label:"친구"},{id:"profile",icon:"⚙️",label:"내 정보"}];
@@ -1132,11 +1153,10 @@ export default function App() {
       <style>{`*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}button:active{transform:scale(0.95)!important;transition:transform 0.08s;}::-webkit-scrollbar{display:none;}@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}.su{animation:slideUp .25s cubic-bezier(.34,1.2,.64,1);}.fi{animation:fadeIn .18s ease;}.shake{animation:shake .4s ease;}`}</style>
       <header style={S.header}>
         <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0,flex:1,overflow:"hidden"}}>
-          {viewingFriend&&<button onClick={()=>setViewingFriendId(null)} style={{background:"#F2F4F6",border:"none",borderRadius:8,padding:"5px 8px",fontSize:10,fontWeight:600,color:"#4E5968",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>← 내 달력</button>}
+          {showingPartner&&<button onClick={()=>setCalView("mine")} style={{background:"#F2F4F6",border:"none",borderRadius:8,padding:"5px 8px",fontSize:10,fontWeight:600,color:"#4E5968",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>← 내 달력</button>}
           <div style={{fontSize:13,fontWeight:800,color:"#191F28",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>
             {isGomshin?"🐻 휴곰 — 곰신":"🐻 휴곰 — 군화"}
-            {viewingFriend&&<span style={{fontSize:11,color:"#8B95A1",fontWeight:500,marginLeft:4}}>· {viewingFriend.name}</span>}
-            {linkedSoldier&&!viewingFriend&&tab==="cal"&&<span style={{fontSize:11,color:"#8B95A1",fontWeight:500,marginLeft:4}}>· {linkedSoldier.name}</span>}
+            {showingPartner&&partner&&<span style={{fontSize:11,color:"#8B95A1",fontWeight:500,marginLeft:4}}>· {partner.name}</span>}
           </div>
         </div>
         <button onClick={()=>setShowNotif(true)} style={{position:"relative",background:"none",border:"none",padding:4,cursor:"pointer"}}>
@@ -1146,9 +1166,9 @@ export default function App() {
       </header>
       {warnMsg&&<WarnModal msg={warnMsg} onClose={()=>setWarnMsg("")}/>}
       <div style={S.content}>
-        {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} perfDates={calOutingDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} linkedSoldier={linkedSoldier} onAddNotif={addNotif} myName={profile.name}/>}
+        {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} perfDates={calOutingDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} partner={partner} calView={calView} setCalView={setCalView} onAddNotif={addNotif} myName={profile.name}/>}
         {tab==="leave"&&!isGomshin&&<LeaveTab profile={profile} leaves={leaves} perfDates={perfDates} onAddLeave={addLeave} onDelLeave={delLeave}/>}
-        {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setViewingFriendId(id);setTab("cal");}} onAddNotif={addNotif} onDisconnect={disconnectPartner} onPoke={poke} onAccept={acceptConnection}/>}
+        {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setCalView("partner");setTab("cal");}} onAddNotif={addNotif} onDisconnect={disconnectPartner} onPoke={poke} onAccept={acceptConnection}/>}
         {tab==="profile"&&<ProfileTab profile={profile} setAuthState={setAuthState} setProfile={async (updater) => {
           const next = typeof updater === "function" ? updater(profile) : updater;
           setProfile(next);
@@ -1166,7 +1186,7 @@ export default function App() {
         }} leaves={leaves} onReset={handleReset} setLeaves={setLeaves} setSchedules={setSchedules} setNotifs={setNotifs} setFriends={setFriends}/>}
       </div>
       <nav style={S.tabBar}>
-        {tabs.map(t=>(<button key={t.id} onClick={()=>{setTab(t.id);setViewingFriendId(null);}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,background:"transparent",border:"none",cursor:"pointer"}}><div style={{width:44,height:28,borderRadius:10,background:tab===t.id&&!viewingFriendId?(isGomshin?"#FFF0F8":"#EBF3FF"):"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"background .18s"}}><span style={{fontSize:19,filter:tab===t.id&&!viewingFriendId?"none":"grayscale(1) opacity(.4)"}}>{t.icon}</span></div><span style={{fontSize:10,fontWeight:tab===t.id&&!viewingFriendId?700:500,color:tab===t.id&&!viewingFriendId?(isGomshin?"#E91E8C":"#3182F6"):"#B0B8C1",transition:"color .18s"}}>{t.label}</span></button>))}
+        {tabs.map(t=>(<button key={t.id} onClick={()=>{setTab(t.id);setCalView("mine");}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,background:"transparent",border:"none",cursor:"pointer"}}><div style={{width:44,height:28,borderRadius:10,background:tab===t.id?(isGomshin?"#FFF0F8":"#EBF3FF"):"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"background .18s"}}><span style={{fontSize:19,filter:tab===t.id?"none":"grayscale(1) opacity(.4)"}}>{t.icon}</span></div><span style={{fontSize:10,fontWeight:tab===t.id?700:500,color:tab===t.id?(isGomshin?"#E91E8C":"#3182F6"):"#B0B8C1",transition:"color .18s"}}>{t.label}</span></button>))}
       </nav>
       {showNotif&&(
         <div className="fi" style={S.overlay} onClick={()=>{setShowNotif(false);markAllRead();}}>
@@ -1367,7 +1387,7 @@ function Onboarding({onComplete}){
 }
 
 function Field({label,sub,children}){return(<div><div style={{fontSize:13,fontWeight:600,color:"#333D4B",marginBottom:6}}>{label}{sub&&<span style={{fontSize:11,color:"#B0B8C1",marginLeft:6,fontWeight:400}}>{sub}</span>}</div>{children}</div>);}
-function CalendarTab({profile,leaves,schedules,perfDates,onAddLeave,onDelLeave,onAddSched,onDelSched,readOnly,isGomshin,linkedSoldier,onAddNotif,myName}){
+function CalendarTab({profile,leaves,schedules,perfDates,onAddLeave,onDelLeave,onAddSched,onDelSched,readOnly,isGomshin,partner,calView,setCalView,onAddNotif,myName}){
   const today=new Date();
   const [vy,setVy]=useState(today.getFullYear());
   const [vm,setVm]=useState(today.getMonth());
@@ -1385,11 +1405,13 @@ function CalendarTab({profile,leaves,schedules,perfDates,onAddLeave,onDelLeave,o
   const leaveByDate=useMemo(()=>{const m={};leaves.forEach(l=>{let d=l.start_date;while(d<=l.end_date){if(!m[d])m[d]=[];m[d].push(l);d=addDays(d,1);}});return m;},[leaves]);
   const schedByDate=useMemo(()=>{const m={};schedules.forEach(s=>{if(!m[s.event_date])m[s.event_date]=[];m[s.event_date].push(s);});return m;},[schedules]);
   const nextOuting=perfDates.find(p=>p.end>=todayKey);
-  const handleGomshinSuggest=(type,dateRange)=>{
-    if(!linkedSoldier||!onAddNotif) return;
+  const handleGomshinSuggest=async(type,dateRange)=>{
+    if(!partner||!onAddNotif) return;
+    setShowGomshinPanel(false);
     const labels={leave_suggest:"🌿 휴가 제안",visit_request:"🏠 영내면회 제안",visit_out_suggest:"🚗 면회외출 제안"};
-    onAddNotif({type,text:`${myName}(님이 ${labels[type]}을 보냈어요 💝`,dateRange:dateRange||null});
-    showToast(`${labels[type]}을 보냈어요!`);setShowGomshinPanel(false);
+    const result=await onAddNotif({type,text:`${myName}님이 ${labels[type]}을 보냈어요 💝`,dateRange:dateRange||null,recipientId:partner.id,senderId:undefined});
+    if(!result?.success){showToast("전송 실패했어요. 다시 시도해주세요");return;}
+    showToast(`${labels[type]}을 보냈어요!`);
   };
   return(
     <div>
@@ -1415,8 +1437,17 @@ function CalendarTab({profile,leaves,schedules,perfDates,onAddLeave,onDelLeave,o
         <button onClick={()=>setShowPicker(true)} style={{flexShrink:0,padding:"8px 16px",borderRadius:100,background:"#3182F6",color:"#fff",fontSize:13,fontWeight:700,border:"none",cursor:"pointer"}}>+ 휴가 등록</button>
         <button onClick={()=>{setSelKey(todayKey);setShowModal(true);}} style={{flexShrink:0,padding:"8px 14px",borderRadius:100,background:"#F2F4F6",color:"#4E5968",fontSize:13,fontWeight:600,border:"none",cursor:"pointer"}}>+ 면회·외출</button>
       </div>)}
-      {readOnly&&isGomshin&&linkedSoldier&&(<div style={{padding:"6px 16px 12px",display:"flex",gap:8,alignItems:"center"}}><div style={{padding:"8px 14px",background:"#FFF0F8",borderRadius:10,fontSize:12,color:"#E91E8C",fontWeight:600}}>👀 {linkedSoldier.name}의 달력</div><button onClick={()=>setShowGomshinPanel(true)} style={{padding:"8px 16px",borderRadius:10,background:"linear-gradient(135deg,#FF4081,#E91E8C)",color:"#fff",fontSize:12,fontWeight:700,border:"none",cursor:"pointer"}}>💌 제안하기</button></div>)}
-      {readOnly&&!isGomshin&&(<div style={{padding:"6px 16px 12px"}}><div style={{padding:"8px 14px",background:"#FFF8E8",borderRadius:10,fontSize:12,color:"#FF9500",fontWeight:600}}>👀 읽기 전용 보기</div></div>)}
+      {partner&&(
+        <div style={{padding:"6px 16px 12px",display:"flex",gap:8,alignItems:"center"}}>
+          <div style={{display:"flex",background:"#F2F4F6",borderRadius:10,padding:3}}>
+            <button onClick={()=>setCalView("mine")} style={{padding:"6px 14px",borderRadius:8,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",background:calView==="mine"?"#fff":"transparent",color:calView==="mine"?"#191F28":"#8B95A1",boxShadow:calView==="mine"?"0 1px 4px rgba(0,0,0,.08)":"none"}}>내 달력</button>
+            <button onClick={()=>setCalView("partner")} style={{padding:"6px 14px",borderRadius:8,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",background:calView==="partner"?"#fff":"transparent",color:calView==="partner"?"#191F28":"#8B95A1",boxShadow:calView==="partner"?"0 1px 4px rgba(0,0,0,.08)":"none"}}>{partner.name}님 달력</button>
+          </div>
+          {readOnly&&(
+            <button onClick={()=>setShowGomshinPanel(true)} style={{padding:"6px 14px",borderRadius:10,background:isGomshin?"linear-gradient(135deg,#FF4081,#E91E8C)":"#3182F6",color:"#fff",fontSize:12,fontWeight:700,border:"none",cursor:"pointer"}}>💌 제안하기</button>
+          )}
+        </div>
+      )}
       <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",padding:"0 4px"}}>
         {DAY_LABELS.map((d,i)=><div key={d} style={{textAlign:"center",fontSize:11,fontWeight:700,padding:"4px 0",color:i===0?"#F04452":i===6?"#3182F6":"#B0B8C1"}}>{d}</div>)}
       </div>
@@ -1462,7 +1493,7 @@ function CalendarTab({profile,leaves,schedules,perfDates,onAddLeave,onDelLeave,o
       </div>
       {showModal&&selKey&&<EventModal dateKey={selKey} leaves={leaves} schedules={schedules} profile={profile} onAddLeave={onAddLeave} onDelLeave={onDelLeave} onAddSched={onAddSched} onDelSched={onDelSched} onClose={()=>setShowModal(false)}/>}
       {showPicker&&<MultiRangePicker leaves={leaves} profile={profile} onClose={()=>setShowPicker(false)} onDone={(ls)=>{onAddLeave(ls);setShowPicker(false);}}/>}
-      {showGomshinPanel&&linkedSoldier&&<GomshinSuggestPanel partnerName={linkedSoldier.name} onSend={handleGomshinSuggest} onClose={()=>setShowGomshinPanel(false)}/>}
+      {showGomshinPanel&&partner&&<GomshinSuggestPanel partnerName={partner.name} onSend={handleGomshinSuggest} onClose={()=>setShowGomshinPanel(false)}/>}
     </div>
   );
 }
@@ -1804,27 +1835,23 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
 
 
   const handleGomshinSend = async (type, dateRange) => {
-  if (!myBf || !onAddNotif) return;
-
-  const labels = {
-    leave_suggest: "🌿 휴가 제안",
-    visit_request: "🏠 영내면회 제안",
-    visit_out_suggest: "🚗 면회외출 제안"
+    if (!myBf || !onAddNotif) return;
+    setShowGomshinSuggest(false);
+    const labels = {
+      leave_suggest: "🌿 휴가 제안",
+      visit_request: "🏠 영내면회 제안",
+      visit_out_suggest: "🚗 면회외출 제안"
+    };
+    const result = await onAddNotif({
+      type,
+      text: `${profile.name}님이 ${labels[type]}을 보냈어요 💝`,
+      dateRange,
+      recipientId: myBf.id,
+      senderId: profile.id
+    });
+    if (!result?.success) { showToast("전송 실패했어요. 다시 시도해주세요"); return; }
+    showToast(`${labels[type]}을 보냈어요!`);
   };
-
-  const result = await onAddNotif({
-    type,
-    text: `${profile.name}님이 ${labels[type]}을 보냈어요 💝`,
-    dateRange,
-    recipientId: myBf.id,
-    senderId: profile.id
-  });
-
-  if (!result?.success) return;
-
-  showToast(`${labels[type]}을 보냈어요!`);
-  setShowGomshinSuggest(false);
-};
 
   const accent=isGomshin?"#E91E8C":"#3182F6";
   return(
@@ -1958,7 +1985,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
         </div>
       )}
 
-      {showGomshinSuggest&&(myBf||suggestTarget)&&<GomshinSuggestPanel partnerName={(suggestTarget||myBf).name} onSend={(type,range)=>onAddNotif({type,text:`${profile.name}님이 제안을 보냈어요 💝`,dateRange:range,recipientId:(suggestTarget||myBf).id})} onClose={()=>{setShowGomshinSuggest(false);setSuggestTarget(null);}}/>}
+      {showGomshinSuggest&&(myBf||suggestTarget)&&<GomshinSuggestPanel partnerName={(suggestTarget||myBf).name} onSend={handleGomshinSend} onClose={()=>{setShowGomshinSuggest(false);setSuggestTarget(null);}}/>}
     </div>
   );
 }
