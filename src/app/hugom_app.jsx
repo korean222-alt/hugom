@@ -1761,6 +1761,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
   const [subTab,setSubTab]=useState("list");
   const [code,setCode]=useState("");
   const [found,setFound]=useState(null);
+  const [suggestTarget,setSuggestTarget]=useState(null);
   const [toast,setToast]=useState("");
   const [showGomshinSuggest,setShowGomshinSuggest]=useState(false);
   const [expandedFriendId,setExpandedFriendId]=useState(null);
@@ -1890,7 +1891,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
                       {/* 달력 버튼 */}
                       <button onClick={()=>onViewFriendCal(f.id)} style={{padding:"8px 12px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>📅 파트너 달력</button>
                       {/* 휴가/면회 제안 버튼 */}
-                      <button onClick={()=>{setFound(f);setShowGomshinSuggest(true);}} style={{padding:"8px 12px",background:"#3182F6",color:"#fff",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>💌 휴가/면회 제안</button>
+                      <button onClick={()=>{setSuggestTarget(f);setShowGomshinSuggest(true);}} style={{padding:"8px 12px",background:"#3182F6",color:"#fff",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>💌 휴가/면회 제안</button>
                       {/* 콕 찌르기 버튼 */}
                       <button onClick={()=>onPoke(f.id)} style={{padding:"8px 12px",background:"linear-gradient(135deg,#FF9500,#FF6B00)",color:"#fff",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>👉 콕 찌르기{f.pokeCount>0?` (${f.pokeCount}번)`:""}</button>
                       {/* 연결해제 버튼 */}
@@ -1957,7 +1958,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
         </div>
       )}
 
-      {showGomshinSuggest&&(myBf||found)&&<GomshinSuggestPanel partnerName={(found||myBf).name} onSend={(type,range)=>onAddNotif({type,text:`${profile.name}님이 제안을 보냈어요 💝`,dateRange:range,recipientId:(found||myBf).id})} onClose={()=>{setShowGomshinSuggest(false);setFound(null);}}/>}
+      {showGomshinSuggest&&(myBf||suggestTarget)&&<GomshinSuggestPanel partnerName={(suggestTarget||myBf).name} onSend={(type,range)=>onAddNotif({type,text:`${profile.name}님이 제안을 보냈어요 💝`,dateRange:range,recipientId:(suggestTarget||myBf).id})} onClose={()=>{setShowGomshinSuggest(false);setSuggestTarget(null);}}/>}
     </div>
   );
 }
