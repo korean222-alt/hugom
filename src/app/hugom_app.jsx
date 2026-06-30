@@ -726,6 +726,7 @@ export default function App() {
         supabase.from("schedules").select("*").eq("user_id", profile.id).order("date"),
         supabase.from("notifications").select("*").eq("user_id", profile.id).order("created_at", { ascending: false }),
       ]);
+      console.log("DEBUG: notifications load result:", nt.data, nt.error);
       if (lv.data) setLeaves(lv.data.map(l => ({
         id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo,
       })));
@@ -806,7 +807,7 @@ export default function App() {
           senderId: msg?.senderId || null,
         }, ...prev]);
       })
-      .subscribe();
+      .subscribe((status) => console.log("DEBUG: partner-notifs realtime status:", status));
     
     // Realtime: 콕 찌르기 업데이트 수신
     const pokeChannel = supabase
@@ -834,7 +835,7 @@ export default function App() {
           }));
         }
       })
-      .subscribe();
+      .subscribe((status) => console.log("DEBUG: poke-updates realtime status:", status));
 
     return () => { 
       supabase.removeChannel(channel); 
