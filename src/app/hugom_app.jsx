@@ -1163,7 +1163,7 @@ export default function App() {
               visit_out_cycle: next.visitOutCycle,
             }).eq("id", next.id);
           }
-        }} leaves={leaves} onReset={handleReset}/>}
+        }} leaves={leaves} onReset={handleReset} setLeaves={setLeaves} setSchedules={setSchedules} setNotifs={setNotifs} setFriends={setFriends}/>}
       </div>
       <nav style={S.tabBar}>
         {tabs.map(t=>(<button key={t.id} onClick={()=>{setTab(t.id);setViewingFriendId(null);}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,background:"transparent",border:"none",cursor:"pointer"}}><div style={{width:44,height:28,borderRadius:10,background:tab===t.id&&!viewingFriendId?(isGomshin?"#FFF0F8":"#EBF3FF"):"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"background .18s"}}><span style={{fontSize:19,filter:tab===t.id&&!viewingFriendId?"none":"grayscale(1) opacity(.4)"}}>{t.icon}</span></div><span style={{fontSize:10,fontWeight:tab===t.id&&!viewingFriendId?700:500,color:tab===t.id&&!viewingFriendId?(isGomshin?"#E91E8C":"#3182F6"):"#B0B8C1",transition:"color .18s"}}>{t.label}</span></button>))}
