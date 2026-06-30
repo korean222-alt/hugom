@@ -2,26 +2,6 @@
 
 import HugomApp from './hugom_app';
 
-function DebugPanel() {
-  const [logs, setLogs] = useState([]);
-  useEffect(() => {
-    const orig = console.log;
-    console.log = (...args) => {
-      orig(...args);
-      setLogs(prev => [...prev.slice(-20), args.map(a => 
-        typeof a === 'object' ? JSON.stringify(a) : String(a)
-      ).join(' ')]);
-    };
-    return () => { console.log = orig; };
-  }, []);
-  return (
-    <div style={{position:"fixed",bottom:60,left:0,right:0,maxHeight:200,overflowY:"auto",background:"rgba(0,0,0,.85)",color:"#0f0",fontSize:10,fontFamily:"monospace",padding:8,zIndex:9999}}>
-      {logs.map((l,i)=><div key={i} style={{marginBottom:2,wordBreak:"break-all"}}>{l}</div>)}
-    </div>
-  );
-}
-
-
 export default function Page() {
   return (
     <>
