@@ -918,25 +918,24 @@ export default function App() {
   };
 
   const addNotif = async (notif) => {
-    const { data, error } = await supabase.from("notifications").insert({
-      user_id: notif.recipientId || profile.id,
-      message: JSON.stringify({ 
-        type: notif.type, 
-        text: notif.text, 
-        dateRange: notif.dateRange || null,
-        senderId: notif.senderId || profile.id // senderId 필수: 보낸 사람 id
-      }),
-      is_read: false,
-    }).select().single();
-    if (error) console.error("알림 전송 실패:", error);
-    if (!error && data) {
-      setNotifs(prev => [{
-        id: data.id, type: notif.type, text: notif.text,
-        dateRange: notif.dateRange || null, time: "방금", read: false,
-        senderId: notif.senderId || profile.id
-      }, ...prev]);
-    }
-  };
+  const { error } = await supabase.from("notifications").insert({
+    user_id: notif.recipientId || profile.id,
+    message: JSON.stringify({ 
+      type: notif.type, 
+      text: notif.text, 
+      dateRange: notif.dateRange || null,
+      senderId: notif.senderId || profile.id
+    }),
+    is_read: false,
+  });
+
+  if (error) {
+    console.error("알림 전송 실패:", error);
+    return { success: false, error };
+  }
+
+  return { success: true };
+};
 
   const acceptConnection = async (senderId) => {
     if (!profile?.id) return;
