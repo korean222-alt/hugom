@@ -924,7 +924,7 @@ export default function App() {
         type: notif.type, 
         text: notif.text, 
         dateRange: notif.dateRange || null,
-        senderId: notif.senderId || profile.id
+        senderId: notif.senderId || profile.id // senderId 필수: 보낸 사람 id
       }),
       is_read: false,
     }).select().single();
@@ -953,6 +953,8 @@ export default function App() {
       await loadPartnerData(senderId);
       alert("연결되었어요! 💝");
       setShowNotif(false);
+      // 연결 완료 후 해당 알림 삭제
+      setNotifs(prev => prev.filter(n => !(n.type === "connection_request" && n.senderId === senderId)));
     } catch (err) {
       console.error("연결 수락 오류:", err);
     }
@@ -1801,7 +1803,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
   const handleGomshinSend=(type,dateRange)=>{
     if(!myBf||!onAddNotif)return;
     const labels={leave_suggest:"🌿 휴가 제안",visit_request:"🏠 영내면회 제안",visit_out_suggest:"🚗 면회외출 제안"};
-    onAddNotif({type,text:`${profile.name}님이 ${labels[type]}을 보냈어요 💝`,dateRange,recipientId:myBf.id});
+    onAddNotif({type,text:`${profile.name}님이 ${labels[type]}을 보냈어요 💝`,dateRange,recipientId:myBf.id, senderId: profile.id});
     showToast(`${labels[type]}을 보냈어요!`);
     setShowGomshinSuggest(false);
   };
