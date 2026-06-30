@@ -1150,6 +1150,7 @@ export default function App() {
 
   return (
     <div style={S.wrap}>
+		<DebugPanel/>
       <style>{`*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}button:active{transform:scale(0.95)!important;transition:transform 0.08s;}::-webkit-scrollbar{display:none;}@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}.su{animation:slideUp .25s cubic-bezier(.34,1.2,.64,1);}.fi{animation:fadeIn .18s ease;}.shake{animation:shake .4s ease;}`}</style>
       <header style={S.header}>
         <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0,flex:1,overflow:"hidden"}}>
