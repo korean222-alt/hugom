@@ -918,24 +918,24 @@ export default function App() {
   };
 
   const addNotif = async (notif) => {
-  const { error } = await supabase.from("notifications").insert({
-    user_id: notif.recipientId || profile.id,
-    message: JSON.stringify({ 
-      type: notif.type, 
-      text: notif.text, 
-      dateRange: notif.dateRange || null,
-      senderId: notif.senderId || profile.id
-    }),
-    is_read: false,
-  });
+    const { error } = await supabase.from("notifications").insert({
+      user_id: notif.recipientId || profile.id,
+      message: JSON.stringify({
+        type: notif.type,
+        text: notif.text,
+        dateRange: notif.dateRange || null,
+        senderId: notif.senderId || profile.id
+      }),
+      is_read: false,
+    });
 
-  if (error) {
-    console.error("알림 전송 실패:", error);
-    return { success: false, error };
-  }
+    if (error) {
+      console.error("알림 전송 실패:", error);
+      return { success: false, error };
+    }
 
-  return { success: true };
-};
+    return { success: true };
+  };
 
   const acceptConnection = async (senderId) => {
     if (!profile?.id) return;
