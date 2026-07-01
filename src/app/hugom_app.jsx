@@ -766,6 +766,8 @@ export default function App() {
 
   // 파트너 데이터 불러오기 함수
   const loadPartnerData = async (partnerId) => {
+    console.log("DEBUG: loadPartnerData starting for partnerId:", partnerId);
+    try {
       const [pu, plv, psc, pk1, pk2] = await Promise.all([
         supabase.from("users").select("*").eq("id", partnerId).single(),
         supabase.from("leaves").select("*").eq("user_id", partnerId).order("start_date"),
@@ -773,26 +775,40 @@ export default function App() {
         supabase.from("pokes").select("*").eq("receiver_id", partnerId).eq("sender_id", profile.id).single(),
         supabase.from("pokes").select("*").eq("receiver_id", profile.id).eq("sender_id", partnerId).single(),
       ]);
-    if (pu.data) {
-      const pd = pu.data;
-      const myPokeCount = pk1.data?.count || 0;
-      const theirPokeCount = pk2.data?.count || 0;
-      const partnerObj = {
-        id: pd.id,
-        name: pd.name,
-        userType: pd.role === "soldier" ? "soldier" : "gomshin",
+
+      console.log("DEBUG: loadPartnerData queries finished", {
+        user: !!pu.data,
+        leaves: plv.data?.length,
+        schedules: psc.data?.length,
+        userError: pu.error?.message
+      });
+
+      if (pu.data) {
+        const pd = pu.data;
+        const myPokeCount = pk1.data?.count || 0;
+        const theirPokeCount = pk2.data?.count || 0;
+        const partnerObj = {
+          id: pd.id,
+          name: pd.name,
+        userType: pd.role === "soldier" || pd.user_type === "soldier" ? "soldier" : "gomshin",
         enlist: pd.enlist_date,
         discharge: pd.discharge_date,
         perf_first_start: pd.perf_first_start,
         perf_cycle_weeks: pd.perf_cycle_weeks,
         perf_cycle_days: pd.perf_cycle_days,
-        relation: pd.role === "soldier" ? "my_soldier" : "my_gomshin",
-        status: "accepted",
-        leaves: plv.data ? plv.data.map(l => ({ id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo })) : [],
-        schedules: psc.data ? psc.data.map(s => ({ id: s.id, event_type: s.type, event_date: s.date, memo: s.memo, title: s.title })) : [],
-        pokeCount: myPokeCount + theirPokeCount,
-      };
-      setFriends([partnerObj]);
+        relation: (pd.role === "soldier" || pd.user_type === "soldier") ? "my_soldier" : "my_gomshin",
+          status: "accepted",
+          leaves: plv.data ? plv.data.map(l => ({ id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo })) : [],
+          schedules: psc.data ? psc.data.map(s => ({ id: s.id, event_type: s.type, event_date: s.date, memo: s.memo, title: s.title })) : [],
+          pokeCount: myPokeCount + theirPokeCount,
+        };
+        console.log("DEBUG: setting partnerObj to friends state", partnerObj.name);
+        setFriends([partnerObj]);
+      } else if (pu.error) {
+        console.error("DEBUG: loadPartnerData failed to fetch partner user:", pu.error);
+      }
+    } catch (err) {
+      console.error("DEBUG: loadPartnerData unexpected error:", err);
     }
   };
 
@@ -1846,7 +1862,8 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
   const today=toKey(new Date());
   const isGomshin=profile.userType==="gomshin";
   const accepted=friends.filter(f=>f.status==="accepted");
-  const myBf=accepted.find(f=>f.relation==="my_soldier") || (isGomshin ? accepted[0] : null);
+  // relation이 정확하지 않을 경우를 대비해 id가 존재하면 우선적으로 파트너로 간주
+  const myBf=accepted.find(f=>f.relation==="my_soldier") || (isGomshin && accepted.length > 0 ? accepted[0] : null);
   const showToast=(msg)=>{setToast(msg);setTimeout(()=>setToast(""),2800);};
 
   // 실제 DB 조회
@@ -1901,6 +1918,23 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
   };
 
   const accent=isGomshin?"#E91E8C":"#3182F6";
+  const manualRecheck = async () => {
+    if (!profile?.id) return;
+    showToast("동기화 중...");
+    const { data } = await supabase.from("users").select("partner_id").eq("id", profile.id).single();
+    if (data?.partner_id) {
+      if (onAccept && !friends.some(f => f.id === data.partner_id)) {
+        // 내부적으로 loadPartnerData 호출을 유도하기 위해 profile 업데이트
+        // (App 컴포넌트의 useEffect가 감지함)
+        window.location.reload(); // 가장 확실한 방법
+      } else {
+        showToast("이미 최신 상태입니다");
+      }
+    } else {
+      showToast("연결된 파트너가 없습니다");
+    }
+  };
+
   return(
     <div style={{display:"flex",flexDirection:"column"}}>
       {toast&&<div style={{position:"fixed",top:68,left:"50%",transform:"translateX(-50%)",background:"#191F28",color:"#fff",padding:"10px 20px",borderRadius:100,fontSize:13,fontWeight:600,zIndex:200,whiteSpace:"nowrap"}}>{toast}</div>}
@@ -1910,6 +1944,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
 
       {subTab==="list"&&(
         <div style={{padding:16,display:"flex",flexDirection:"column",gap:10}}>
+          <button onClick={manualRecheck} style={{fontSize:11,color:"#8B95A1",background:"#F2F4F6",border:"none",borderRadius:8,padding:"6px 12px",alignSelf:"flex-end",cursor:"pointer",fontWeight:600}}>🔄 정보 새로고침</button>
           {/* 곰신: 연결된 군화 카드 */}
           {isGomshin&&myBf&&(<>
             <div style={{background:"linear-gradient(135deg,#FF4081,#E91E8C)",borderRadius:20,padding:"16px 18px"}}>
@@ -1939,7 +1974,12 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
             <div style={{textAlign:"center",padding:"40px 0",color:"#B0B8C1"}}>
               <div style={{fontSize:40,marginBottom:12}}>💝</div>
               <div style={{fontSize:14,fontWeight:600,color:"#E91E8C"}}>군화를 아직 연결하지 않았어요</div>
-              <div style={{fontSize:12,color:"#B0B8C1",marginTop:6}}>친구 추가 탭에서 군화 코드를 입력해요</div>
+              <div style={{fontSize:12,color:"#B0B8C1",marginTop:6}}>친구 추가 탭에서 군화 코드를 입력하거나,<br/>상대방이 수락할 때까지 기다려주세요.</div>
+              {profile?.partner_id && (
+                <div style={{marginTop:16,fontSize:11,color:"#3182F6",background:"#EBF3FF",padding:"8px",borderRadius:10}}>
+                  시스템상 연결 정보가 감지되었습니다.<br/>위의 🔄 버튼을 눌러 새로고침 해보세요.
+                </div>
+              )}
             </div>
           )}
 
