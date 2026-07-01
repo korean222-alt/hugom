@@ -631,7 +631,20 @@ function LandingPage() {
 }
 
 export default function App() {
-  const [tab,setTab]=useState("cal");
+  const [tab, setTab] = useState("cal");
+  
+  // 보험 로직 ③: 탭 전환 시(특히 친구 탭) partner_id 재확인
+  const handleTabChange = useCallback(async (newTab) => {
+    setTab(newTab);
+    setCalView("mine");
+    if (newTab === "friends" && profile?.id) {
+      const { data } = await supabase.from("users").select("partner_id").eq("id", profile.id).single();
+      if (data?.partner_id && data.partner_id !== profile.partner_id) {
+        setProfile(p => ({ ...p, partner_id: data.partner_id }));
+        loadPartnerData(data.partner_id);
+      }
+    }
+  }, [profile?.id, profile?.partner_id]);
   const [leaves,setLeaves]=useState([]);
   const [schedules,setSchedules]=useState([]);
   const [notifs,setNotifs]=useState([]);
@@ -853,14 +866,41 @@ export default function App() {
           setFriends([]);
         }
       })
-      .subscribe((status) => console.log("DEBUG: profile-updates realtime status:", status));
+      .subscribe((status) => {
+        console.log("DEBUG: profile-updates realtime status:", status);
+        if (status === "SUBSCRIBED") {
+          // 최초 구독이든 재연결이든, 구독될 때마다 한 번 확인 (보험 로직 ②)
+          supabase.from("users").select("partner_id").eq("id", profile.id).single()
+            .then(({data}) => {
+              if (data?.partner_id && data.partner_id !== profile.partner_id) {
+                setProfile(p => ({ ...p, partner_id: data.partner_id }));
+                loadPartnerData(data.partner_id);
+              }
+            });
+        }
+      });
 
     return () => { 
       supabase.removeChannel(channel); 
       supabase.removeChannel(pokeChannel);
       supabase.removeChannel(profileChannel);
     };
-  }, [profile?.id]);
+  }, [profile?.id, profile?.partner_id]);
+
+  // 보험 로직 ①: 앱이 백그라운드였다가 돌아왔을 때(visibilitychange) partner_id 재확인
+  useEffect(() => {
+    if (!profile?.id) return;
+    const recheckPartner = async () => {
+      const { data } = await supabase.from("users").select("partner_id").eq("id", profile.id).single();
+      if (data?.partner_id && data.partner_id !== profile.partner_id) {
+        setProfile(p => ({ ...p, partner_id: data.partner_id }));
+        loadPartnerData(data.partner_id);
+      }
+    };
+    const onVisible = () => { if (document.visibilityState === "visible") recheckPartner(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [profile?.id, profile?.partner_id]);
 
   const checkLimits=(newLeaves,existingLeaves)=>{
     if(!profile||profile.userType==="gomshin") return null;
@@ -961,8 +1001,15 @@ export default function App() {
     try {
       // 양쪽 partner_id 업데이트
       const { error: e1 } = await supabase.from("users").update({ partner_id: senderId }).eq("id", profile.id);
+      if (e1) { alert("연결 실패. 다시 시도해주세요."); return; }
+      
       const { error: e2 } = await supabase.from("users").update({ partner_id: profile.id }).eq("id", senderId);
-      if (e1 || e2) { alert("연결 실패. 다시 시도해주세요."); return; }
+      if (e2) {
+        // 내 쪽 롤백
+        await supabase.from("users").update({ partner_id: null }).eq("id", profile.id);
+        alert("연결 실패. 다시 시도해주세요.");
+        return;
+      }
       
       // 프로필 로컬 업데이트
       setProfile(p => ({ ...p, partner_id: senderId }));
@@ -1168,7 +1215,7 @@ export default function App() {
       <div style={S.content}>
         {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} perfDates={calOutingDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} partner={partner} calView={calView} setCalView={setCalView} onAddNotif={addNotif} myName={profile.name}/>}
         {tab==="leave"&&!isGomshin&&<LeaveTab profile={profile} leaves={leaves} perfDates={perfDates} onAddLeave={addLeave} onDelLeave={delLeave}/>}
-        {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setCalView("partner");setTab("cal");}} onAddNotif={addNotif} onDisconnect={disconnectPartner} onPoke={poke} onAccept={acceptConnection}/>}
+        {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setCalView("partner");handleTabChange("cal");}} onAddNotif={addNotif} onDisconnect={disconnectPartner} onPoke={poke} onAccept={acceptConnection}/>}
         {tab==="profile"&&<ProfileTab profile={profile} setAuthState={setAuthState} setProfile={async (updater) => {
           const next = typeof updater === "function" ? updater(profile) : updater;
           setProfile(next);
@@ -1186,7 +1233,7 @@ export default function App() {
         }} leaves={leaves} onReset={handleReset} setLeaves={setLeaves} setSchedules={setSchedules} setNotifs={setNotifs} setFriends={setFriends}/>}
       </div>
       <nav style={S.tabBar}>
-        {tabs.map(t=>(<button key={t.id} onClick={()=>{setTab(t.id);setCalView("mine");}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,background:"transparent",border:"none",cursor:"pointer"}}><div style={{width:44,height:28,borderRadius:10,background:tab===t.id?(isGomshin?"#FFF0F8":"#EBF3FF"):"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"background .18s"}}><span style={{fontSize:19,filter:tab===t.id?"none":"grayscale(1) opacity(.4)"}}>{t.icon}</span></div><span style={{fontSize:10,fontWeight:tab===t.id?700:500,color:tab===t.id?(isGomshin?"#E91E8C":"#3182F6"):"#B0B8C1",transition:"color .18s"}}>{t.label}</span></button>))}
+        {tabs.map(t=>(<button key={t.id} onClick={()=>handleTabChange(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,background:"transparent",border:"none",cursor:"pointer"}}><div style={{width:44,height:28,borderRadius:10,background:tab===t.id?(isGomshin?"#FFF0F8":"#EBF3FF"):"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"background .18s"}}><span style={{fontSize:19,filter:tab===t.id?"none":"grayscale(1) opacity(.4)"}}>{t.icon}</span></div><span style={{fontSize:10,fontWeight:tab===t.id?700:500,color:tab===t.id?(isGomshin?"#E91E8C":"#3182F6"):"#B0B8C1",transition:"color .18s"}}>{t.label}</span></button>))}
       </nav>
       {showNotif&&(
         <div className="fi" style={S.overlay} onClick={()=>{setShowNotif(false);markAllRead();}}>
@@ -1299,7 +1346,7 @@ function Onboarding({onComplete}){
     if(!enlist||!discharge) return setErr("입대일과 전역일을 입력해주세요");
     if(enlist>=discharge) return setErr("전역일이 입대일보다 늦어야 해요");
     const code=Math.random().toString(36).slice(2,8).toUpperCase();
-    onComplete({name:name.trim(),enlist,discharge,userType,perf_first_start:null,perf_cycle_weeks:null,perf_cycle_days:null,annual_limits:{이등병:null,일병:null,상병:null,병장:null},reward_limit:6,missedMonths:userType==="gomshin"?{}:missedMonths,visitOutCycle:null,invite_code:code});
+    onComplete({name:name.trim(),enlist,discharge,userType,perf_first_start:null,perf_cycle_weeks:null,perf_cycle_days:null,annual_limits:{이등병:null,일병:null,상병:null,병장:null},reward_limit:{이등병:6,일병:6,상병:6,병장:6},missedMonths:userType==="gomshin"?{}:missedMonths,visitOutCycle:null,invite_code:code});
   };
 
   if(!userType) return(
