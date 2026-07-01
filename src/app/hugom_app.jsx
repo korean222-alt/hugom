@@ -1015,26 +1015,13 @@ export default function App() {
   const acceptConnection = async (senderId) => {
     if (!profile?.id) return;
     try {
-      // 양쪽 partner_id 업데이트
-      const { error: e1 } = await supabase.from("users").update({ partner_id: senderId }).eq("id", profile.id);
-      if (e1) { alert("연결 실패. 다시 시도해주세요."); return; }
-      
-      const { error: e2 } = await supabase.from("users").update({ partner_id: profile.id }).eq("id", senderId);
-      if (e2) {
-        // 내 쪽 롤백
-        await supabase.from("users").update({ partner_id: null }).eq("id", profile.id);
-        alert("연결 실패. 다시 시도해주세요.");
-        return;
-      }
-      
-      // 프로필 로컬 업데이트
+      const { error } = await supabase.rpc('accept_connection', { p_sender_id: senderId });
+      if (error) { console.error("연결 수락 실패:", error); alert("연결 실패. 다시 시도해주세요."); return; }
+
       setProfile(p => ({ ...p, partner_id: senderId }));
-      
-      // 파트너 데이터 로드
       await loadPartnerData(senderId);
       alert("연결되었어요! 💝");
       setShowNotif(false);
-      // 연결 완료 후 해당 알림 삭제
       setNotifs(prev => prev.filter(n => !(n.type === "connection_request" && n.senderId === senderId)));
     } catch (err) {
       console.error("연결 수락 오류:", err);
@@ -1130,8 +1117,8 @@ export default function App() {
   const disconnectPartner = useCallback(async () => {
     if (!profile?.id) return;
     const partner = friends[0];
-    await supabase.from("users").update({ partner_id: null }).eq("id", profile.id);
-    if (partner?.id) await supabase.from("users").update({ partner_id: null }).eq("id", partner.id);
+    const { error } = await supabase.rpc('disconnect_partner', { p_partner_id: partner?.id || null });
+    if (error) { console.error("연결 해제 실패:", error); return; }
     setProfile(p => ({ ...p, partner_id: null }));
     setFriends([]);
   }, [profile?.id, friends]);
@@ -2626,8 +2613,7 @@ function DdayShareCard({profile,rankInfo}){
   const [open,setOpen]=useState(false);const [copied,setCopied]=useState(false);const [cardStyle,setCardStyle]=useState("army");
   const today=toKey(new Date());const left=Math.max(0,diffDays(today,profile.discharge));const total=diffDays(profile.enlist,profile.discharge);const served=Math.max(0,Math.min(total,diffDays(profile.enlist,today)));const pct=Math.min(100,Math.round((served/total)*100));
   const isGomshin=profile.userType==="gomshin";const rank=rankInfo?.currentRank||"";const hobon=rankInfo?.hobon||"";const theme=CARD_THEMES[cardStyle];
-  const generateImage=()=>{
-    const canvas=document.createElement("canvas");canvas.width=900;canvas.height=1100;const ctx=canvas.getContext("2d");
+  const drawCard = (ctx, canvas) => {
     const grad=ctx.createLinearGradient(0,0,900,1100);const colors={army:["#3D5A1E","#556B2F","#8FA47A"],pink:["#FF4081","#E91E8C","#C2185B"],dark:["#1A1A2E","#16213E","#0F3460"]}[cardStyle];
     grad.addColorStop(0,colors[0]);grad.addColorStop(.5,colors[1]);grad.addColorStop(1,colors[2]);ctx.fillStyle=grad;ctx.fillRect(0,0,900,1100);
     ctx.fillStyle="rgba(255,255,255,0.05)";ctx.beginPath();ctx.arc(750,150,260,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(-50,950,200,0,Math.PI*2);ctx.fill();
@@ -2648,9 +2634,23 @@ function DdayShareCard({profile,rankInfo}){
     ctx.fillStyle="#FFD700";ctx.beginPath();ctx.arc(60+780*(pct/100),808,10,0,Math.PI*2);ctx.fill();
     ctx.fillStyle="rgba(255,255,255,0.4)";ctx.font="20px sans-serif";ctx.textAlign="center";ctx.fillText("#휴곰 #군복무 #전역카운트",450,900);
     ctx.fillStyle="rgba(255,255,255,0.3)";ctx.font="18px sans-serif";ctx.textAlign="right";ctx.fillText(today+" 기준 · 휴곰 앱",840,960);
+  };
+  const generateImage=()=>{
+    const canvas=document.createElement("canvas");canvas.width=900;canvas.height=1100;const ctx=canvas.getContext("2d");
+    drawCard(ctx, canvas);
     return canvas.toDataURL("image/png");
   };
-  const handleDownload=()=>{const url=generateImage();const a=document.createElement("a");a.href=url;a.download=`휴곰_${profile.name}_D${left}.png`;a.click();};
+  const handleDownload=async()=>{
+    const canvas=document.createElement("canvas");canvas.width=900;canvas.height=1100;const ctx=canvas.getContext("2d");
+    drawCard(ctx, canvas);
+    const fileName=`휴곰_${profile.name}_D${left}.png`;
+    canvas.toBlob(async(blob)=>{
+      if(!blob)return;
+      const file=new File([blob],fileName,{type:"image/png"});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){ try{await navigator.share({files:[file],title:fileName});return;}catch(err){} }
+      const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=fileName;a.click();URL.revokeObjectURL(url);
+    },"image/png");
+  };
   const handleCopyText=()=>{const msg=`🐻🪖 ${profile.name} ${rank||""}\n전역 D-${left}\n${profile.discharge} 전역예정\n복무 ${pct}% (${served}/${total}일)\n\n#휴곰 #군복무 #전역카운트`;navigator.clipboard?.writeText(msg).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2500);});};
   return(
     <div style={S.card}>
@@ -2683,7 +2683,7 @@ function DdayShareCard({profile,rankInfo}){
             <button onClick={handleDownload} style={{flex:1,padding:"13px 8px",background:"linear-gradient(135deg,#3D5A1E,#556B2F)",color:"#fff",borderRadius:12,border:"none",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><span>💾</span><span>이미지 저장</span></button>
             <button onClick={handleCopyText} style={{flex:1,padding:"13px 8px",background:copied?"#05C072":"#F2F4F6",color:copied?"#fff":"#4E5968",borderRadius:12,border:"none",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><span>{copied?"✓":"📋"}</span><span>{copied?"복사됨":"텍스트 복사"}</span></button>
           </div>
-          <div style={{textAlign:"center",fontSize:11,color:"#B0B8C1"}}>🐻 이미지 저장 후 카카오톡·인스타그램에 공유해보세요!</div>
+          <div style={{textAlign:"center",fontSize:11,color:"#B0B8C1"}}>🐻 저장 버튼을 누르면 공유 시트가 열려요. "이미지 저장"을 선택하면 갤러리에 바로 저장돼요!</div>
         </div>
       )}
     </div>
