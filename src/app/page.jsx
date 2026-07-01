@@ -1,5 +1,8 @@
 'use client';
 
+// 빌드 시 정적 렌더링 에러 방지 (Supabase 클라이언트가 환경변수를 필요로 함)
+export const dynamic = 'force-dynamic';
+
 import HugomApp from './hugom_app';
 
 export default function Page() {

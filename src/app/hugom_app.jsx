@@ -632,12 +632,20 @@ function LandingPage() {
 
 export default function App() {
   const [tab, setTab] = useState("cal");
-  
+  const [profile,setProfile]=useState(null);
+  const [calView,setCalView]=useState("mine");
+  const [leaves,setLeaves]=useState([]);
+  const [schedules,setSchedules]=useState([]);
+  const [notifs,setNotifs]=useState([]);
+  const [friends,setFriends]=useState([]);
+  const [showNotif,setShowNotif]=useState(false);
+  const [warnMsg,setWarnMsg]=useState("");
+
   // 보험 로직 ③: 탭 전환 시(특히 친구 탭) partner_id 재확인
   const handleTabChange = useCallback(async (newTab) => {
     setTab(newTab);
     setCalView("mine");
-    if (newTab === "friends" && profile?.id) {
+    if (newTab === "friends" && profile?.id && supabase) {
       const { data } = await supabase.from("users").select("partner_id").eq("id", profile.id).single();
       if (data?.partner_id && data.partner_id !== profile.partner_id) {
         setProfile(p => ({ ...p, partner_id: data.partner_id }));
@@ -645,14 +653,6 @@ export default function App() {
       }
     }
   }, [profile?.id, profile?.partner_id]);
-  const [leaves,setLeaves]=useState([]);
-  const [schedules,setSchedules]=useState([]);
-  const [notifs,setNotifs]=useState([]);
-  const [friends,setFriends]=useState([]);
-  const [showNotif,setShowNotif]=useState(false);
-  const [profile,setProfile]=useState(null);
-  const [warnMsg,setWarnMsg]=useState("");
-  const [calView,setCalView]=useState("mine");
   // authState: "loading" | "no_user" | "need_onboarding" | "ready"
   const [authState,setAuthState]=useState("loading");
   const unread=notifs.filter(n=>!n.read).length;
@@ -798,7 +798,7 @@ export default function App() {
 
   // Realtime: 파트너가 보낸 알림 실시간 수신 (PHASE 4)
   useEffect(()=>{
-    if (!profile?.id) return;
+    if (!profile?.id || !supabase) return;
     const channel = supabase
       .channel("partner-notifs-" + profile.id)
       .on("postgres_changes", {
@@ -889,7 +889,7 @@ export default function App() {
 
   // 보험 로직 ①: 앱이 백그라운드였다가 돌아왔을 때(visibilitychange) partner_id 재확인
   useEffect(() => {
-    if (!profile?.id) return;
+    if (!profile?.id || !supabase) return;
     const recheckPartner = async () => {
       const { data } = await supabase.from("users").select("partner_id").eq("id", profile.id).single();
       if (data?.partner_id && data.partner_id !== profile.partner_id) {
