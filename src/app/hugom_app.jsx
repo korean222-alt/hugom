@@ -730,6 +730,31 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // 보험 로직 ④: Realtime 구독을 통한 프로필(partner_id) 즉시 동기화
+  useEffect(() => {
+    if (!profile?.id) return;
+    const channel = supabase
+      .channel(`profile-sync-${profile.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'users',
+        filter: `id=eq.${profile.id}`
+      }, (payload) => {
+        const newPartnerId = payload.new.partner_id;
+        if (newPartnerId && newPartnerId !== profile.partner_id) {
+          setProfile(p => ({ ...p, partner_id: newPartnerId }));
+          loadPartnerData(newPartnerId);
+        } else if (!newPartnerId && profile.partner_id) {
+          // 연결 해제 시
+          setProfile(p => ({ ...p, partner_id: null }));
+          setFriends([]);
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [profile?.id, profile?.partner_id]);
+
   // 프로필 로드 후 leaves/schedules/notifications 불러오기 + 파트너 데이터 로드
   useEffect(()=>{
     if (!profile?.id) return;
@@ -2644,12 +2669,35 @@ function DdayShareCard({profile,rankInfo}){
     const canvas=document.createElement("canvas");canvas.width=900;canvas.height=1100;const ctx=canvas.getContext("2d");
     drawCard(ctx, canvas);
     const fileName=`휴곰_${profile.name}_D${left}.png`;
-    canvas.toBlob(async(blob)=>{
-      if(!blob)return;
-      const file=new File([blob],fileName,{type:"image/png"});
-      if(navigator.canShare&&navigator.canShare({files:[file]})){ try{await navigator.share({files:[file],title:fileName});return;}catch(err){} }
-      const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=fileName;a.click();URL.revokeObjectURL(url);
-    },"image/png");
+    
+    // 모바일 사파리 등에서 비동기 콜백(toBlob) 내의 navigator.share는 사용자 액션으로 인정되지 않아 차단될 수 있음
+    // 따라서 미리 canvas에서 파일을 생성한 뒤 share를 호출하거나, dataURL을 활용
+    try {
+      const dataUrl = canvas.toDataURL("image/png");
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], fileName, { type: "image/png" });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: "휴곰 전역 D-day 카드",
+          text: `${profile.name}님의 전역 카운트다운! 🐻`
+        });
+      } else {
+        const a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = fileName;
+        a.click();
+      }
+    } catch (err) {
+      console.error("공유/다운로드 실패:", err);
+      // 폴백: 일반 다운로드
+      const url = canvas.toDataURL("image/png");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.click();
+    }
   };
   const handleCopyText=()=>{const msg=`🐻🪖 ${profile.name} ${rank||""}\n전역 D-${left}\n${profile.discharge} 전역예정\n복무 ${pct}% (${served}/${total}일)\n\n#휴곰 #군복무 #전역카운트`;navigator.clipboard?.writeText(msg).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2500);});};
   return(
