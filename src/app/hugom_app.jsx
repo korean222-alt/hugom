@@ -740,6 +740,7 @@ export default function App() {
   const [tab, setTab] = useState("cal");
   const [profile,setProfile]=useState(null);
   const [calView,setCalView]=useState("mine");
+  const [viewingFriendId,setViewingFriendId]=useState(null); // 친구 목록에서 선택한 "지금 보고 있는 친구" id (여러 명 지원)
   const [leaves,setLeaves]=useState([]);
   const [schedules,setSchedules]=useState([]);
   const [notifs,setNotifs]=useState([]);
@@ -855,50 +856,64 @@ export default function App() {
         };
       }));
 
-      // 파트너 데이터 로드 (partner_id 있을 때)
-      if (profile.partner_id) {
-        await loadPartnerData(profile.partner_id);
-      }
+      // 친구/파트너 목록 로드 (connections 테이블 기반, 여러 명 지원)
+      await loadFriendsData();
     };
     loadData();
   }, [profile?.id]);
 
-  // 파트너 데이터 불러오기 함수
-  const loadPartnerData = async (partnerId) => {
+  // 친구(파트너) 목록을 통째로 다시 불러오는 함수 — connections 테이블에 있는 "나의" accepted 연결을 전부 가져옴
+  const loadFriendsData = async () => {
+    if (!profile?.id) return;
     try {
-      const [pu, plv, psc, pk1, pk2] = await Promise.all([
-        supabase.from("users").select("*").eq("id", partnerId).single(),
-        supabase.from("leaves").select("*").eq("user_id", partnerId).order("start_date"),
-        supabase.from("schedules").select("*").eq("user_id", partnerId).order("date"),
-        supabase.from("pokes").select("*").eq("receiver_id", partnerId).eq("sender_id", profile.id).single(),
-        supabase.from("pokes").select("*").eq("receiver_id", profile.id).eq("sender_id", partnerId).single(),
-      ]);
+      const { data: conns, error: connErr } = await supabase
+        .from("connections")
+        .select("friend_id")
+        .eq("user_id", profile.id)
+        .eq("status", "accepted");
 
-      if (pu.data) {
+      if (connErr) { console.error("연결 목록 조회 실패:", connErr); return; }
+
+      const friendIds = (conns || []).map(c => c.friend_id);
+      if (friendIds.length === 0) { setFriends([]); return; }
+
+      const friendObjs = await Promise.all(friendIds.map(async (friendId) => {
+        const [pu, plv, psc, pk1, pk2] = await Promise.all([
+          supabase.from("users").select("*").eq("id", friendId).single(),
+          supabase.from("leaves").select("*").eq("user_id", friendId).order("start_date"),
+          supabase.from("schedules").select("*").eq("user_id", friendId).order("date"),
+          supabase.from("pokes").select("*").eq("receiver_id", friendId).eq("sender_id", profile.id).single(),
+          supabase.from("pokes").select("*").eq("receiver_id", profile.id).eq("sender_id", friendId).single(),
+        ]);
+
+        if (!pu.data) {
+          if (pu.error) console.error("loadFriendsData failed to fetch friend user:", pu.error);
+          return null;
+        }
+
         const pd = pu.data;
         const myPokeCount = pk1.data?.count || 0;
         const theirPokeCount = pk2.data?.count || 0;
-        const partnerObj = {
+        return {
           id: pd.id,
           name: pd.name,
-        userType: pd.role === "soldier" || pd.user_type === "soldier" ? "soldier" : "gomshin",
-        enlist: pd.enlist_date,
-        discharge: pd.discharge_date,
-        perf_first_start: pd.perf_first_start,
-        perf_cycle_weeks: pd.perf_cycle_weeks,
-        perf_cycle_days: pd.perf_cycle_days,
-        relation: (pd.role === "soldier" || pd.user_type === "soldier") ? "my_soldier" : "my_gomshin",
+          userType: pd.role === "soldier" || pd.user_type === "soldier" ? "soldier" : "gomshin",
+          enlist: pd.enlist_date,
+          discharge: pd.discharge_date,
+          perf_first_start: pd.perf_first_start,
+          perf_cycle_weeks: pd.perf_cycle_weeks,
+          perf_cycle_days: pd.perf_cycle_days,
+          relation: (pd.role === "soldier" || pd.user_type === "soldier") ? "my_soldier" : "my_gomshin",
           status: "accepted",
           leaves: plv.data ? plv.data.map(l => ({ id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo })) : [],
           schedules: psc.data ? psc.data.map(s => ({ id: s.id, event_type: s.type, event_date: s.date, memo: s.memo, title: s.title })) : [],
           pokeCount: myPokeCount + theirPokeCount,
         };
-        setFriends([partnerObj]);
-      } else if (pu.error) {
-        console.error("loadPartnerData failed to fetch partner user:", pu.error);
-      }
+      }));
+
+      setFriends(friendObjs.filter(Boolean));
     } catch (err) {
-      console.error("loadPartnerData unexpected error:", err);
+      console.error("loadFriendsData unexpected error:", err);
     }
   };
 
@@ -956,56 +971,36 @@ export default function App() {
       })
       .subscribe();
 
-    // Realtime: 내 users 행 UPDATE 감지 (곰신이 수락 받았을 때 partner_id 자동 반영)
-    const profileChannel = supabase
-      .channel("profile-updates-" + profile.id)
+    // Realtime: 내 connections 행 변경 감지 (친구가 수락/연결해제 되었을 때 목록 자동 반영, 여러 명 지원)
+    const connectionsChannel = supabase
+      .channel("connections-updates-" + profile.id)
       .on("postgres_changes", {
-        event: "UPDATE", schema: "public", table: "users",
-        filter: `id=eq.${profile.id}`,
-      }, (payload) => {
-        const newPartnerId = payload.new.partner_id;
-        if (newPartnerId && newPartnerId !== profile.partner_id) {
-          setProfile(p => ({ ...p, partner_id: newPartnerId }));
-          loadPartnerData(newPartnerId);
-        } else if (!newPartnerId && profile.partner_id) {
-          setProfile(p => ({ ...p, partner_id: null }));
-          setFriends([]);
-        }
+        event: "*", schema: "public", table: "connections",
+        filter: `user_id=eq.${profile.id}`,
+      }, () => {
+        loadFriendsData();
       })
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
           // 구독이 (재)연결될 때마다 한 번 확인 — 구독 성사 전에 놓친 변경사항을 보정
-          supabase.from("users").select("partner_id").eq("id", profile.id).single()
-            .then(({data}) => {
-              if (data?.partner_id && data.partner_id !== profile.partner_id) {
-                setProfile(p => ({ ...p, partner_id: data.partner_id }));
-                loadPartnerData(data.partner_id);
-              }
-            });
+          loadFriendsData();
         }
       });
 
     return () => { 
       supabase.removeChannel(channel); 
       supabase.removeChannel(pokeChannel);
-      supabase.removeChannel(profileChannel);
+      supabase.removeChannel(connectionsChannel);
     };
-  }, [profile?.id, profile?.partner_id]);
+  }, [profile?.id]);
 
-  // 앱이 백그라운드였다가 돌아왔을 때(visibilitychange) partner_id 재확인 — 백그라운드 중 realtime 소켓이 끊겼을 수 있어 보정
+  // 앱이 백그라운드였다가 돌아왔을 때(visibilitychange) 친구 목록 재확인 — 백그라운드 중 realtime 소켓이 끊겼을 수 있어 보정
   useEffect(() => {
     if (!profile?.id || !supabase) return;
-    const recheckPartner = async () => {
-      const { data } = await supabase.from("users").select("partner_id").eq("id", profile.id).single();
-      if (data?.partner_id && data.partner_id !== profile.partner_id) {
-        setProfile(p => ({ ...p, partner_id: data.partner_id }));
-        loadPartnerData(data.partner_id);
-      }
-    };
-    const onVisible = () => { if (document.visibilityState === "visible") recheckPartner(); };
+    const onVisible = () => { if (document.visibilityState === "visible") loadFriendsData(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [profile?.id, profile?.partner_id]);
+  }, [profile?.id]);
 
   // 진급 감지: last_seen_rank보다 실제로 계급이 올라간 경우에만 축하 팝업 표시
   useEffect(() => {
@@ -1122,8 +1117,7 @@ export default function App() {
       const { error } = await supabase.rpc('accept_connection', { p_sender_id: senderId });
       if (error) { console.error("연결 수락 실패:", error); alert("연결 실패. 다시 시도해주세요."); return; }
 
-      setProfile(p => ({ ...p, partner_id: senderId }));
-      await loadPartnerData(senderId);
+      await loadFriendsData();
       alert("연결되었어요! 💝");
       setShowNotif(false);
       setNotifs(prev => prev.filter(n => !(n.type === "connection_request" && n.senderId === senderId)));
@@ -1217,24 +1211,21 @@ export default function App() {
     }
   };
 
-  // 파트너 연결 해제 (PHASE 4)
-  const disconnectPartner = useCallback(async () => {
-    if (!profile?.id) return;
-    const partner = friends[0];
-    const { error } = await supabase.rpc('disconnect_partner', { p_partner_id: partner?.id || null });
+  // 친구/파트너 연결 해제 — 여러 명 중 특정 친구 id 하나만 해제 (PHASE 4, 다중 친구 지원으로 friendId 인자 추가)
+  const disconnectPartner = useCallback(async (friendId) => {
+    if (!profile?.id || !friendId) return;
+    const { error } = await supabase.rpc('disconnect_partner', { p_partner_id: friendId });
     if (error) { console.error("연결 해제 실패:", error); return; }
-    setProfile(p => ({ ...p, partner_id: null }));
-    setFriends([]);
-  }, [profile?.id, friends]);
+    setFriends(prev => prev.filter(f => f.id !== friendId));
+    setViewingFriendId(prev => (prev === friendId ? null : prev));
+  }, [profile?.id]);
 
   const handleReset = async () => {
     if (profile?.id) {
       try {
-        // partner_id FK(ON DELETE NO ACTION) 때문에 연결된 상태로는 내 계정을 삭제할 수 없음 → 먼저 연결 해제
-        if (profile.partner_id) {
-          const { error: dcError } = await supabase.rpc('disconnect_partner', { p_partner_id: profile.partner_id });
-          if (dcError) console.error("연결 해제 실패:", dcError);
-        }
+        // partner_id FK(ON DELETE NO ACTION) 때문에 연결된 상태로는 내 계정을 삭제할 수 없음 → 먼저 모든 연결 해제
+        const { error: dcError } = await supabase.rpc('disconnect_all_connections');
+        if (dcError) console.error("연결 해제 실패:", dcError);
 
         await Promise.all([
           supabase.from("leaves").delete().eq("user_id", profile.id),
@@ -1306,7 +1297,7 @@ export default function App() {
 
   // 로그인 + 프로필 있음 → 메인 앱
   const isGomshin=profile.userType==="gomshin";
-  const partner=friends.find(f=>f.status==="accepted")||null;
+  const partner=friends.find(f=>f.id===viewingFriendId)||null;
   // calView: "mine" | "partner" — 곰신/군화 공통으로 토글 가능 (상단 state 선언 참조)
   const showingPartner=calView==="partner"&&!!partner;
   const calLeaves=showingPartner?(partner.leaves||[]):leaves;
@@ -1341,7 +1332,7 @@ export default function App() {
       <div style={S.content}>
         {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} perfDates={calOutingDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} partner={partner} calView={calView} setCalView={setCalView} onAddNotif={addNotif} myName={profile.name}/>}
         {tab==="leave"&&!isGomshin&&<LeaveTab profile={profile} leaves={leaves} perfDates={perfDates} onAddLeave={addLeave} onDelLeave={delLeave}/>}
-        {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setCalView("partner");handleTabChange("cal");}} onAddNotif={addNotif} onDisconnect={disconnectPartner} onPoke={poke} onAccept={acceptConnection}/>}
+        {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setViewingFriendId(id);setCalView("partner");setTab("cal");}} onAddNotif={addNotif} onDisconnect={disconnectPartner} onPoke={poke} onAccept={acceptConnection}/>}
         {tab==="profile"&&<ProfileTab profile={profile} setAuthState={setAuthState} setProfile={async (updater) => {
           const next = typeof updater === "function" ? updater(profile) : updater;
           setProfile(next);
@@ -1973,8 +1964,6 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
   const today=toKey(new Date());
   const isGomshin=profile.userType==="gomshin";
   const accepted=friends.filter(f=>f.status==="accepted");
-  // relation이 정확하지 않을 경우를 대비해 id가 존재하면 우선적으로 파트너로 간주
-  const myBf=accepted.find(f=>f.relation==="my_soldier") || (isGomshin && accepted.length > 0 ? accepted[0] : null);
   const showToast=(msg)=>{setToast(msg);setTimeout(()=>setToast(""),2800);};
 
   // 실제 DB 조회
@@ -2010,7 +1999,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
 
 
   const handleGomshinSend = async (type, dateRange) => {
-    if (!myBf || !onAddNotif) return;
+    if (!suggestTarget || !onAddNotif) return;
     setShowGomshinSuggest(false);
     const labels = {
       leave_suggest: "🌿 휴가 제안",
@@ -2021,7 +2010,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
       type,
       text: `${profile.name}님이 ${labels[type]}을 보냈어요 💝`,
       dateRange,
-      recipientId: myBf.id,
+      recipientId: suggestTarget.id,
       senderId: profile.id
     });
     if (!result?.success) { showToast("전송 실패했어요. 다시 시도해주세요"); return; }
@@ -2032,17 +2021,14 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
   const manualRecheck = async () => {
     if (!profile?.id) return;
     showToast("동기화 중...");
-    const { data } = await supabase.from("users").select("partner_id").eq("id", profile.id).single();
-    if (data?.partner_id) {
-      if (onAccept && !friends.some(f => f.id === data.partner_id)) {
-        // 내부적으로 loadPartnerData 호출을 유도하기 위해 profile 업데이트
-        // (App 컴포넌트의 useEffect가 감지함)
-        window.location.reload(); // 가장 확실한 방법
-      } else {
-        showToast("이미 최신 상태입니다");
-      }
+    const { data } = await supabase.from("connections").select("friend_id").eq("user_id", profile.id).eq("status", "accepted");
+    const remoteIds = (data || []).map(c => c.friend_id);
+    const localIds = friends.map(f => f.id);
+    const isSame = remoteIds.length === localIds.length && remoteIds.every(id => localIds.includes(id));
+    if (!isSame) {
+      window.location.reload(); // 가장 확실한 방법 — 새로고침 시 App의 useEffect가 loadFriendsData를 다시 호출
     } else {
-      showToast("연결된 파트너가 없습니다");
+      showToast("이미 최신 상태입니다");
     }
   };
 
@@ -2056,86 +2042,44 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
       {subTab==="list"&&(
         <div style={{padding:16,display:"flex",flexDirection:"column",gap:10}}>
           <button onClick={manualRecheck} style={{fontSize:11,color:"#8B95A1",background:"#F2F4F6",border:"none",borderRadius:8,padding:"6px 12px",alignSelf:"flex-end",cursor:"pointer",fontWeight:600}}>🔄 정보 새로고침</button>
-          {/* 곰신: 연결된 군화 카드 */}
-          {isGomshin&&myBf&&(<>
-            <div style={{background:"linear-gradient(135deg,#FF4081,#E91E8C)",borderRadius:20,padding:"16px 18px"}}>
-              <div style={{fontSize:11,color:"rgba(255,255,255,.7)",fontWeight:600,marginBottom:8}}>연결된 군화</div>
-              <div style={{display:"flex",alignItems:"center",gap:12}}>
-                <div style={{width:44,height:44,borderRadius:14,background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🪖</div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:17,fontWeight:800,color:"#fff"}}>{myBf.name}</div>
-                  <div style={{fontSize:12,color:"rgba(255,255,255,.7)",marginTop:2}}>D-{Math.max(0,diffDays(today,myBf.discharge))}일 전역까지</div>
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                  <button onClick={()=>onViewFriendCal(myBf.id)} style={{padding:"8px 12px",background:"rgba(255,255,255,.9)",color:"#E91E8C",borderRadius:12,border:"none",fontSize:12,fontWeight:800,cursor:"pointer"}}>📅 달력</button>
-                  <button onClick={()=>{if(window.confirm("파트너 연결을 해제할까요?"))onDisconnect();}} style={{padding:"6px 10px",background:"rgba(255,255,255,.2)",color:"rgba(255,255,255,.8)",borderRadius:10,border:"1px solid rgba(255,255,255,.3)",fontSize:11,fontWeight:600,cursor:"pointer"}}>연결해제</button>
-                </div>
-              </div>
-            </div>
-            <div style={{background:"#FFF0F8",borderRadius:16,padding:"14px 16px",border:"1px solid #F8BBD0"}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#C2185B",marginBottom:10}}>💝 날짜 선택해서 제안하기</div>
-              <button onClick={()=>setShowGomshinSuggest(true)} style={{...S.btn,background:"linear-gradient(135deg,#FF4081,#E91E8C)",color:"#fff",boxShadow:"0 4px 14px rgba(233,30,140,.3)"}}>💌 날짜 선택해서 제안 보내기</button>
-            </div>
-            <div style={{background:"#FFF8E8",borderRadius:16,padding:"14px 16px",border:"1px solid #FFDB9A"}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#E65100",marginBottom:10}}>👋 콕 찌르기</div>
-              <button onClick={()=>onPoke(myBf.id)} style={{...S.btn,background:"linear-gradient(135deg,#FF9500,#FF6B00)",color:"#fff",boxShadow:"0 4px 14px rgba(255,107,0,.3)"}}>👉 콕 찌르기{myBf.pokeCount>0?` (${myBf.pokeCount}번)`:""}</button>
-            </div>
-          </>)}
-          {isGomshin&&!myBf&&(
-            <div style={{textAlign:"center",padding:"40px 0",color:"#B0B8C1"}}>
-              <div style={{fontSize:40,marginBottom:12}}>💝</div>
-              <div style={{fontSize:14,fontWeight:600,color:"#E91E8C"}}>군화를 아직 연결하지 않았어요</div>
-              <div style={{fontSize:12,color:"#B0B8C1",marginTop:6}}>친구 추가 탭에서 군화 코드를 입력하거나,<br/>상대방이 수락할 때까지 기다려주세요.</div>
-              {profile?.partner_id && (
-                <div style={{marginTop:16,fontSize:11,color:"#3182F6",background:"#EBF3FF",padding:"8px",borderRadius:10}}>
-                  시스템상 연결 정보가 감지되었습니다.<br/>위의 🔄 버튼을 눌러 새로고침 해보세요.
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 군화: 친구 목록 - 아코디언 스타일 */}
-          {!isGomshin&&<>
-            {accepted.length>0
-              ? accepted.map(f=>(
-                <div key={f.id} style={{display:"flex",flexDirection:"column",gap:0}}>
-                  <div onClick={()=>setExpandedFriendId(expandedFriendId===f.id?null:f.id)} style={{...S.card,display:"flex",alignItems:"center",gap:12,cursor:"pointer",borderRadius:expandedFriendId===f.id?"16px 16px 0 0":"16px",transition:"all 0.2s",marginBottom:0}}>
-                    <div style={{width:40,height:40,borderRadius:12,background:"#F2F4F6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
-                      {f.userType==="soldier"?"🪖":"💝"}
-                    </div>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:14,fontWeight:700,color:"#191F28"}}>{f.name}</div>
-                      <div style={{fontSize:11,color:"#8B95A1",marginTop:1}}>
-                        {f.userType==="soldier"?`D-${Math.max(0,diffDays(today,f.discharge))}일 전역까지`:"연결된 친구"}
-                      </div>
-                    </div>
-                    <div style={{fontSize:18,color:"#8B95A1",transition:"transform 0.2s",transform:expandedFriendId===f.id?"rotate(180deg)":"rotate(0deg)"}}>▼</div>
+          {/* 친구/파트너 목록 - 아코디언 스타일 (곰신/군인 공통, 여러 명 지원) */}
+          {accepted.length>0
+            ? accepted.map(f=>(
+              <div key={f.id} style={{display:"flex",flexDirection:"column",gap:0}}>
+                <div onClick={()=>setExpandedFriendId(expandedFriendId===f.id?null:f.id)} style={{...S.card,display:"flex",alignItems:"center",gap:12,cursor:"pointer",borderRadius:expandedFriendId===f.id?"16px 16px 0 0":"16px",transition:"all 0.2s",marginBottom:0}}>
+                  <div style={{width:40,height:40,borderRadius:12,background:"#F2F4F6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
+                    {f.userType==="soldier"?"🪖":"💝"}
                   </div>
-                  {expandedFriendId===f.id&&(
-                    <div style={{background:"#F9FAFB",borderRadius:"0 0 16px 16px",padding:"10px 14px",display:"flex",flexDirection:"column",gap:8,borderLeft:"1px solid #E8ECF0",borderRight:"1px solid #E8ECF0",borderBottom:"1px solid #E8ECF0"}}>
-                      {/* 달력 버튼 */}
-                      <button onClick={()=>onViewFriendCal(f.id)} style={{padding:"8px 12px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>📅 파트너 달력</button>
-                      {/* 휴가/면회 제안 버튼 */}
-                      <button onClick={()=>{setSuggestTarget(f);setShowGomshinSuggest(true);}} style={{padding:"8px 12px",background:"#3182F6",color:"#fff",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>💌 휴가/면회 제안</button>
-                      {/* 콕 찌르기 버튼 */}
-                      <button onClick={()=>onPoke(f.id)} style={{padding:"8px 12px",background:"linear-gradient(135deg,#FF9500,#FF6B00)",color:"#fff",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>👉 콕 찌르기{f.pokeCount>0?` (${f.pokeCount}번)`:""}</button>
-                      {/* 연결해제 버튼 */}
-                      <button onClick={()=>{if(window.confirm("파트너 연결을 해제할까요?"))onDisconnect();}} style={{padding:"8px 12px",background:"#FFF0F1",color:"#F04452",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>연결해제</button>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:14,fontWeight:700,color:"#191F28"}}>{f.name}</div>
+                    <div style={{fontSize:11,color:"#8B95A1",marginTop:1}}>
+                      {f.userType==="soldier"?`D-${Math.max(0,diffDays(today,f.discharge))}일 전역까지`:"연결된 친구"}
                     </div>
-                  )}
+                  </div>
+                  <div style={{fontSize:18,color:"#8B95A1",transition:"transform 0.2s",transform:expandedFriendId===f.id?"rotate(180deg)":"rotate(0deg)"}}>▼</div>
                 </div>
-              ))
-              : (
-                <div style={{textAlign:"center",padding:"60px 0",color:"#B0B8C1"}}>
-                  <div style={{fontSize:40,marginBottom:12}}>👥</div>
-                  <div style={{fontSize:14,fontWeight:600}}>연결된 친구가 없어요</div>
-                  <div style={{fontSize:12,marginTop:6}}>친구 추가 탭에서 코드로 연결해요</div>
-                </div>
-              )
-            }
-          </>}
-
-
+                {expandedFriendId===f.id&&(
+                  <div style={{background:"#F9FAFB",borderRadius:"0 0 16px 16px",padding:"10px 14px",display:"flex",flexDirection:"column",gap:8,borderLeft:"1px solid #E8ECF0",borderRight:"1px solid #E8ECF0",borderBottom:"1px solid #E8ECF0"}}>
+                    {/* 달력 버튼 */}
+                    <button onClick={()=>onViewFriendCal(f.id)} style={{padding:"8px 12px",background:"#EBF3FF",color:"#3182F6",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>📅 파트너 달력</button>
+                    {/* 휴가/면회 제안 버튼 */}
+                    <button onClick={()=>{setSuggestTarget(f);setShowGomshinSuggest(true);}} style={{padding:"8px 12px",background:"#3182F6",color:"#fff",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>💌 휴가/면회 제안</button>
+                    {/* 콕 찌르기 버튼 */}
+                    <button onClick={()=>onPoke(f.id)} style={{padding:"8px 12px",background:"linear-gradient(135deg,#FF9500,#FF6B00)",color:"#fff",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>👉 콕 찌르기{f.pokeCount>0?` (${f.pokeCount}번)`:""}</button>
+                    {/* 연결해제 버튼 */}
+                    <button onClick={()=>{if(window.confirm("연결을 해제할까요?"))onDisconnect(f.id);}} style={{padding:"8px 12px",background:"#FFF0F1",color:"#F04452",borderRadius:10,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>연결해제</button>
+                  </div>
+                )}
+              </div>
+            ))
+            : (
+              <div style={{textAlign:"center",padding:"60px 0",color:"#B0B8C1"}}>
+                <div style={{fontSize:40,marginBottom:12}}>{isGomshin?"💝":"👥"}</div>
+                <div style={{fontSize:14,fontWeight:600,color:isGomshin?"#E91E8C":"#191F28"}}>{isGomshin?"군화를 아직 연결하지 않았어요":"연결된 친구가 없어요"}</div>
+                <div style={{fontSize:12,color:"#B0B8C1",marginTop:6}}>친구 추가 탭에서 코드로 연결해요</div>
+              </div>
+            )
+          }
         </div>
       )}
 
@@ -2183,7 +2127,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
         </div>
       )}
 
-      {showGomshinSuggest&&(myBf||suggestTarget)&&<GomshinSuggestPanel partnerName={(suggestTarget||myBf).name} onSend={handleGomshinSend} onClose={()=>{setShowGomshinSuggest(false);setSuggestTarget(null);}}/>}
+      {showGomshinSuggest&&suggestTarget&&<GomshinSuggestPanel partnerName={suggestTarget.name} onSend={handleGomshinSend} onClose={()=>{setShowGomshinSuggest(false);setSuggestTarget(null);}}/>}
     </div>
   );
 }
