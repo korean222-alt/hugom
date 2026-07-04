@@ -214,13 +214,15 @@ function PromotionCard({ profile, rank, hobon, onClose }) {
     haloGrad.addColorStop(0, "rgba(255,215,0,0.35)"); haloGrad.addColorStop(1, "rgba(255,215,0,0)");
     ctx.fillStyle = haloGrad; ctx.beginPath(); ctx.arc(W/2, 780, 280, 0, Math.PI*2); ctx.fill();
 
-    // 마스코트
-    ctx.save();
-    ctx.translate(W / 2, 920);
-    ctx.scale(2.3, 2.3); // 140px 기준으로 그린 뒤 확대 — 큰 폰트로 직접 그리면 일부 브라우저(iOS Safari 등)에서 이모지가 컬러가 아닌 단색 실루엣으로 깨짐
-    ctx.font = "140px serif";
-    ctx.fillText(profile.userType === "gomshin" ? "🧸" : "🐻", 0, 0);
-    ctx.restore();
+    // 마스코트: 폰트로 직접 큰 사이즈를 그리면(340px) 색이 깨지고, ctx.scale로 확대해서 그려도(이전 시도) 아예 안 보이는
+    // 환경이 있어 — 검증된 안전한 크기(140px)로 별도 캔버스에 그린 뒤 drawImage로 이미지째 확대하는 방식으로 완전히 우회
+    const emojiSrc = document.createElement("canvas");
+    emojiSrc.width = 160; emojiSrc.height = 160;
+    const ectx = emojiSrc.getContext("2d");
+    ectx.font = "140px serif"; ectx.textAlign = "center"; ectx.textBaseline = "middle";
+    ectx.fillText(profile.userType === "gomshin" ? "🧸" : "🐻", 80, 88);
+    const bearSize = 320;
+    ctx.drawImage(emojiSrc, W / 2 - bearSize / 2, 920 - bearSize / 2, bearSize, bearSize);
 
     // 헤드라인 — 계급명 길이(이등병 vs 병장)에 관계없이 폭에 맞춰 자동 축소
     const headline = `${rank} 진급을 축하해요!`;
