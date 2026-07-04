@@ -40,18 +40,18 @@ const HOLIDAYS = {
   // 2026년
   "2026-01-01":"신정","2026-02-16":"설날연휴","2026-02-17":"설날","2026-02-18":"설날연휴",
   "2026-03-01":"삼일절","2026-03-02":"삼일절(대체)","2026-05-01":"노동절","2026-05-05":"어린이날",
-  "2026-05-24":"부처님오신날","2026-05-25":"부처님오신날(대체)","2026-06-06":"현충일","2026-08-15":"광복절",
+  "2026-05-24":"부처님오신날","2026-05-25":"부처님오신날(대체)","2026-06-06":"현충일","2026-07-17":"제헌절","2026-08-15":"광복절",
   "2026-08-17":"광복절(대체)","2026-09-24":"추석연휴","2026-09-25":"추석","2026-09-26":"추석연휴",
   "2026-10-03":"개천절","2026-10-05":"개천절(대체)","2026-10-09":"한글날","2026-12-25":"크리스마스",
   // 2027년
   "2027-01-01":"신정","2027-02-06":"설날연휴","2027-02-07":"설날","2027-02-08":"설날연휴","2027-02-09":"설날(대체)",
   "2027-03-01":"삼일절","2027-05-01":"노동절","2027-05-03":"노동절(대체)","2027-05-05":"어린이날","2027-05-13":"부처님오신날",
-  "2027-06-06":"현충일","2027-08-15":"광복절","2027-08-16":"광복절(대체)","2027-09-14":"추석연휴","2027-09-15":"추석","2027-09-16":"추석연휴",
+  "2027-06-06":"현충일","2027-07-17":"제헌절","2027-07-19":"제헌절(대체)","2027-08-15":"광복절","2027-08-16":"광복절(대체)","2027-09-14":"추석연휴","2027-09-15":"추석","2027-09-16":"추석연휴",
   "2027-10-03":"개천절","2027-10-04":"개천절(대체)","2027-10-09":"한글날","2027-10-11":"한글날(대체)","2027-12-25":"크리스마스","2027-12-27":"크리스마스(대체)",
   // 2028년
   "2028-01-01":"신정","2028-01-26":"설날연휴","2028-01-27":"설날","2028-01-28":"설날연휴","2028-03-01":"삼일절",
   "2028-04-12":"국회의원선거","2028-05-01":"노동절","2028-05-02":"부처님오신날","2028-05-05":"어린이날",
-  "2028-06-06":"현충일","2028-08-15":"광복절","2028-10-02":"추석연휴","2028-10-03":"추석/개천절","2028-10-04":"추석연휴",
+  "2028-06-06":"현충일","2028-07-17":"제헌절","2028-08-15":"광복절","2028-10-02":"추석연휴","2028-10-03":"추석/개천절","2028-10-04":"추석연휴",
   "2028-10-05":"대체공휴일","2028-10-09":"한글날","2028-12-25":"크리스마스",
 };
 const DAY_LABELS = ["일","월","화","수","목","금","토"];
@@ -182,6 +182,105 @@ function WarnModal({ msg, onClose }) {
         <div style={{fontSize:16,fontWeight:800,color:"#F04452",textAlign:"center",marginBottom:8}}>한도 초과!</div>
         <div style={{fontSize:13,color:"#4E5968",textAlign:"center",lineHeight:1.6,marginBottom:20,whiteSpace:"pre-line"}}>{msg}</div>
         <button onClick={onClose} style={{...S.btn,background:"#F04452",color:"#fff",boxShadow:"none"}}>확인</button>
+      </div>
+    </div>
+  );
+}
+
+function PromotionCard({ profile, rank, hobon, onClose }) {
+  const [saved, setSaved] = useState(false);
+  const drawCard = (ctx) => {
+    const W = 1080, H = 1920;
+    const grad = ctx.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, "#2D4A1E"); grad.addColorStop(0.55, "#3D5A1E"); grad.addColorStop(1, "#556B2F");
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+
+    // 은은한 배경 장식 원
+    ctx.fillStyle = "rgba(255,255,255,0.05)";
+    ctx.beginPath(); ctx.arc(920, 220, 300, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-60, 1500, 260, 0, Math.PI * 2); ctx.fill();
+
+    // 작은 반짝임 포인트 (과하지 않게)
+    ctx.fillStyle = "rgba(255,215,0,0.55)";
+    [[150,300,10],[930,470,7],[200,900,6],[900,1020,9]].forEach(([x,y,r])=>{ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); });
+
+    // 상단 로고
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "bold 34px sans-serif";
+    ctx.fillText("🐻 휴곰", W / 2, 160);
+
+    // 마스코트 뒤 골드 후광
+    const haloGrad = ctx.createRadialGradient(W/2, 780, 40, W/2, 780, 280);
+    haloGrad.addColorStop(0, "rgba(255,215,0,0.35)"); haloGrad.addColorStop(1, "rgba(255,215,0,0)");
+    ctx.fillStyle = haloGrad; ctx.beginPath(); ctx.arc(W/2, 780, 280, 0, Math.PI*2); ctx.fill();
+
+    // 마스코트
+    ctx.font = "340px serif"; ctx.fillText(profile.userType === "gomshin" ? "🧸" : "🐻", W / 2, 920);
+
+    // 헤드라인 — 계급명 길이(이등병 vs 병장)에 관계없이 폭에 맞춰 자동 축소
+    const headline = `${rank} 진급을 축하해요!`;
+    let hFont = 78;
+    ctx.font = `900 ${hFont}px sans-serif`;
+    const maxHeadlineWidth = 940;
+    while (ctx.measureText(headline).width > maxHeadlineWidth && hFont > 40) { hFont -= 3; ctx.font = `900 ${hFont}px sans-serif`; }
+    ctx.fillStyle = "#fff"; ctx.fillText(headline, W / 2, 1060);
+
+    // 서브텍스트
+    const sub = `${profile.name}님, ${hobon}호봉으로 새 출발이에요 🐾`;
+    let sFont = 40;
+    ctx.font = `600 ${sFont}px sans-serif`;
+    while (ctx.measureText(sub).width > 900 && sFont > 24) { sFont -= 2; ctx.font = `600 ${sFont}px sans-serif`; }
+    ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.fillText(sub, W / 2, 1130);
+
+    // 얇은 골드 구분선
+    ctx.strokeStyle = "rgba(255,215,0,0.5)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(W/2 - 70, 1180); ctx.lineTo(W/2 + 70, 1180); ctx.stroke();
+
+    // 하단 브랜딩 (작게)
+    ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.font = "bold 30px sans-serif";
+    ctx.fillText("🐻 휴곰", W / 2, 1800);
+    ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.font = "22px sans-serif";
+    ctx.fillText(toKey(new Date()) + " · 휴곰 앱", W / 2, 1846);
+  };
+  const makeCanvas = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1080; canvas.height = 1920;
+    drawCard(canvas.getContext("2d"));
+    return canvas;
+  };
+  const handleShare = async () => {
+    const canvas = makeCanvas();
+    const fileName = `휴곰_${rank}진급_${profile.name}.png`;
+    try {
+      const dataUrl = canvas.toDataURL("image/png");
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], fileName, { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: "휴곰 진급 축하", text: `${profile.name}님 ${rank} 진급을 축하해요! 🎉` });
+      } else {
+        const a = document.createElement("a"); a.href = dataUrl; a.download = fileName; a.click();
+      }
+      setSaved(true); setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      console.error("진급 카드 공유/저장 실패:", err);
+      const url = canvas.toDataURL("image/png");
+      const a = document.createElement("a"); a.href = url; a.download = fileName; a.click();
+    }
+  };
+  return (
+    <div className="fi" style={{ position: "fixed", inset: 0, background: "rgba(20,30,15,.62)", zIndex: 320, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+      <div className="shake" style={{ width: "100%", maxWidth: 320, borderRadius: 24, overflow: "hidden", boxShadow: "0 12px 40px rgba(0,0,0,.35)", background: "linear-gradient(160deg,#2D4A1E,#3D5A1E 55%,#556B2F)", position: "relative" }}>
+        <div style={{ position: "absolute", top: -30, right: -30, width: 130, height: 130, borderRadius: "50%", background: "rgba(255,255,255,.05)" }} />
+        <div style={{ padding: "28px 22px 24px", position: "relative", textAlign: "center" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,.8)", marginBottom: 18 }}>🐻 휴곰</div>
+          <div style={{ fontSize: 84, marginBottom: 8, filter: "drop-shadow(0 0 24px rgba(255,215,0,.35))" }}>{profile.userType === "gomshin" ? "🧸" : "🐻"}</div>
+          <div style={{ fontSize: 21, fontWeight: 900, color: "#fff", lineHeight: 1.35, marginBottom: 8 }}>{rank} 진급을 축하해요! 🎉</div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,.75)", marginBottom: 20 }}>{profile.name}님, {hobon}호봉으로 새 출발이에요 🐾</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={onClose} style={{ flex: 1, padding: "12px 8px", borderRadius: 12, border: "1px solid rgba(255,255,255,.3)", background: "transparent", color: "rgba(255,255,255,.85)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>닫기</button>
+            <button onClick={handleShare} style={{ flex: 1.4, padding: "12px 8px", borderRadius: 12, border: "none", background: saved ? "#05C072" : "linear-gradient(135deg,#FFD700,#F5B700)", color: saved ? "#fff" : "#3D2E00", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>{saved ? "✓ 완료" : "📤 스토리로 공유"}</button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -640,19 +739,12 @@ export default function App() {
   const [friends,setFriends]=useState([]);
   const [showNotif,setShowNotif]=useState(false);
   const [warnMsg,setWarnMsg]=useState("");
+  const [promoRankInfo,setPromoRankInfo]=useState(null); // {rank, hobon} — 진급 축하 팝업 트리거
 
-  // 보험 로직 ③: 탭 전환 시(특히 친구 탭) partner_id 재확인
-  const handleTabChange = useCallback(async (newTab) => {
+  const handleTabChange = useCallback((newTab) => {
     setTab(newTab);
     setCalView("mine");
-    if (newTab === "friends" && profile?.id && supabase) {
-      const { data } = await supabase.from("users").select("partner_id").eq("id", profile.id).single();
-      if (data?.partner_id && data.partner_id !== profile.partner_id) {
-        setProfile(p => ({ ...p, partner_id: data.partner_id }));
-        loadPartnerData(data.partner_id);
-      }
-    }
-  }, [profile?.id, profile?.partner_id]);
+  }, []);
   // authState: "loading" | "no_user" | "need_onboarding" | "ready"
   const [authState,setAuthState]=useState("loading");
   const unread=notifs.filter(n=>!n.read).length;
@@ -707,6 +799,7 @@ export default function App() {
             visitOutCycle: data.visit_out_cycle || null,
             invite_code: data.partner_code,
             partner_id: data.partner_id || null,
+            lastSeenRank: data.last_seen_rank || null,
           });
           setAuthState("ready");
         } else {
@@ -730,31 +823,6 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 보험 로직 ④: Realtime 구독을 통한 프로필(partner_id) 즉시 동기화
-  useEffect(() => {
-    if (!profile?.id) return;
-    const channel = supabase
-      .channel(`profile-sync-${profile.id}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'users',
-        filter: `id=eq.${profile.id}`
-      }, (payload) => {
-        const newPartnerId = payload.new.partner_id;
-        if (newPartnerId && newPartnerId !== profile.partner_id) {
-          setProfile(p => ({ ...p, partner_id: newPartnerId }));
-          loadPartnerData(newPartnerId);
-        } else if (!newPartnerId && profile.partner_id) {
-          // 연결 해제 시
-          setProfile(p => ({ ...p, partner_id: null }));
-          setFriends([]);
-        }
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [profile?.id, profile?.partner_id]);
-
   // 프로필 로드 후 leaves/schedules/notifications 불러오기 + 파트너 데이터 로드
   useEffect(()=>{
     if (!profile?.id) return;
@@ -764,7 +832,6 @@ export default function App() {
         supabase.from("schedules").select("*").eq("user_id", profile.id).order("date"),
         supabase.from("notifications").select("*").eq("user_id", profile.id).order("created_at", { ascending: false }),
       ]);
-      console.log("DEBUG: notifications load result:", nt.data, nt.error);
       if (lv.data) setLeaves(lv.data.map(l => ({
         id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo,
       })));
@@ -791,7 +858,6 @@ export default function App() {
 
   // 파트너 데이터 불러오기 함수
   const loadPartnerData = async (partnerId) => {
-    console.log("DEBUG: loadPartnerData starting for partnerId:", partnerId);
     try {
       const [pu, plv, psc, pk1, pk2] = await Promise.all([
         supabase.from("users").select("*").eq("id", partnerId).single(),
@@ -800,13 +866,6 @@ export default function App() {
         supabase.from("pokes").select("*").eq("receiver_id", partnerId).eq("sender_id", profile.id).single(),
         supabase.from("pokes").select("*").eq("receiver_id", profile.id).eq("sender_id", partnerId).single(),
       ]);
-
-      console.log("DEBUG: loadPartnerData queries finished", {
-        user: !!pu.data,
-        leaves: plv.data?.length,
-        schedules: psc.data?.length,
-        userError: pu.error?.message
-      });
 
       if (pu.data) {
         const pd = pu.data;
@@ -827,13 +886,12 @@ export default function App() {
           schedules: psc.data ? psc.data.map(s => ({ id: s.id, event_type: s.type, event_date: s.date, memo: s.memo, title: s.title })) : [],
           pokeCount: myPokeCount + theirPokeCount,
         };
-        console.log("DEBUG: setting partnerObj to friends state", partnerObj.name);
         setFriends([partnerObj]);
       } else if (pu.error) {
-        console.error("DEBUG: loadPartnerData failed to fetch partner user:", pu.error);
+        console.error("loadPartnerData failed to fetch partner user:", pu.error);
       }
     } catch (err) {
-      console.error("DEBUG: loadPartnerData unexpected error:", err);
+      console.error("loadPartnerData unexpected error:", err);
     }
   };
 
@@ -861,7 +919,7 @@ export default function App() {
           senderId: msg?.senderId || null,
         }, ...prev]);
       })
-      .subscribe((status) => console.log("DEBUG: partner-notifs realtime status:", status));
+      .subscribe();
     
     // Realtime: 콕 찌르기 업데이트 수신
     const pokeChannel = supabase
@@ -889,7 +947,7 @@ export default function App() {
           }));
         }
       })
-      .subscribe((status) => console.log("DEBUG: poke-updates realtime status:", status));
+      .subscribe();
 
     // Realtime: 내 users 행 UPDATE 감지 (곰신이 수락 받았을 때 partner_id 자동 반영)
     const profileChannel = supabase
@@ -908,9 +966,8 @@ export default function App() {
         }
       })
       .subscribe((status) => {
-        console.log("DEBUG: profile-updates realtime status:", status);
         if (status === "SUBSCRIBED") {
-          // 최초 구독이든 재연결이든, 구독될 때마다 한 번 확인 (보험 로직 ②)
+          // 구독이 (재)연결될 때마다 한 번 확인 — 구독 성사 전에 놓친 변경사항을 보정
           supabase.from("users").select("partner_id").eq("id", profile.id).single()
             .then(({data}) => {
               if (data?.partner_id && data.partner_id !== profile.partner_id) {
@@ -928,7 +985,7 @@ export default function App() {
     };
   }, [profile?.id, profile?.partner_id]);
 
-  // 보험 로직 ①: 앱이 백그라운드였다가 돌아왔을 때(visibilitychange) partner_id 재확인
+  // 앱이 백그라운드였다가 돌아왔을 때(visibilitychange) partner_id 재확인 — 백그라운드 중 realtime 소켓이 끊겼을 수 있어 보정
   useEffect(() => {
     if (!profile?.id || !supabase) return;
     const recheckPartner = async () => {
@@ -942,6 +999,21 @@ export default function App() {
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [profile?.id, profile?.partner_id]);
+
+  // 진급 감지: last_seen_rank보다 실제로 계급이 올라간 경우에만 축하 팝업 표시
+  useEffect(() => {
+    if (!profile?.id || profile.userType === "gomshin") return;
+    let info;
+    try { info = calcRankInfo(profile.enlist, profile.missedMonths); } catch { return; }
+    if (!info?.currentRank) return;
+    const current = info.currentRank;
+    const prev = profile.lastSeenRank;
+    if (prev === current) return;
+    const isRealPromotion = prev && RANK_LABELS.indexOf(current) > RANK_LABELS.indexOf(prev);
+    if (isRealPromotion) setPromoRankInfo({ rank: current, hobon: info.hobon });
+    setProfile(p => ({ ...p, lastSeenRank: current }));
+    supabase.from("users").update({ last_seen_rank: current }).eq("id", profile.id);
+  }, [profile?.id, profile?.enlist, profile?.missedMonths, profile?.userType, profile?.lastSeenRank]);
 
   const checkLimits=(newLeaves,existingLeaves)=>{
     if(!profile||profile.userType==="gomshin") return null;
@@ -1150,12 +1222,30 @@ export default function App() {
 
   const handleReset = async () => {
     if (profile?.id) {
-      await Promise.all([
-        supabase.from("leaves").delete().eq("user_id", profile.id),
-        supabase.from("schedules").delete().eq("user_id", profile.id),
-        supabase.from("notifications").delete().eq("user_id", profile.id),
-        supabase.from("users").delete().eq("id", profile.id),
-      ]);
+      try {
+        // partner_id FK(ON DELETE NO ACTION) 때문에 연결된 상태로는 내 계정을 삭제할 수 없음 → 먼저 연결 해제
+        if (profile.partner_id) {
+          const { error: dcError } = await supabase.rpc('disconnect_partner', { p_partner_id: profile.partner_id });
+          if (dcError) console.error("연결 해제 실패:", dcError);
+        }
+
+        await Promise.all([
+          supabase.from("leaves").delete().eq("user_id", profile.id),
+          supabase.from("schedules").delete().eq("user_id", profile.id),
+          supabase.from("notifications").delete().eq("user_id", profile.id),
+        ]);
+
+        const { error: delError } = await supabase.from("users").delete().eq("id", profile.id);
+        if (delError) {
+          console.error("계정 삭제 실패:", delError);
+          alert("계정 삭제 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.");
+          return; // 삭제 실패 시 로그아웃하지 않음 — 안 지워졌는데 지워진 것처럼 보이지 않도록
+        }
+      } catch (err) {
+        console.error("초기화 오류:", err);
+        alert("처리 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.");
+        return;
+      }
     }
     await supabase.auth.signOut();
     setProfile(null);
@@ -1240,6 +1330,7 @@ export default function App() {
         </button>
       </header>
       {warnMsg&&<WarnModal msg={warnMsg} onClose={()=>setWarnMsg("")}/>}
+      {promoRankInfo&&<PromotionCard profile={profile} rank={promoRankInfo.rank} hobon={promoRankInfo.hobon} onClose={()=>setPromoRankInfo(null)}/>}
       <div style={S.content}>
         {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} perfDates={calOutingDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} partner={partner} calView={calView} setCalView={setCalView} onAddNotif={addNotif} myName={profile.name}/>}
         {tab==="leave"&&!isGomshin&&<LeaveTab profile={profile} leaves={leaves} perfDates={perfDates} onAddLeave={addLeave} onDelLeave={delLeave}/>}
@@ -1256,6 +1347,7 @@ export default function App() {
               reward_limit: next.reward_limit,
               missed_months: next.missedMonths,
               visit_out_cycle: next.visitOutCycle,
+              last_seen_rank: next.lastSeenRank,
             }).eq("id", next.id);
           }
         }} leaves={leaves} onReset={handleReset} setLeaves={setLeaves} setSchedules={setSchedules} setNotifs={setNotifs} setFriends={setFriends}/>}
@@ -1314,7 +1406,7 @@ export default function App() {
                           📅 {n.dateRange}
                         </div>
                       )}
-                      {n.type==="connection_request"&&n.senderId&&!isRead&&(
+                      {n.type==="connection_request"&&n.senderId&&(
                         <button onClick={()=>{acceptConnection(n.senderId);}} style={{display:"inline-block",fontSize:12,color:"#fff",fontWeight:700,background:"#3182F6",border:"none",borderRadius:8,padding:"6px 14px",marginTop:6,cursor:"pointer"}}>
                           💝 수락
                         </button>
@@ -2098,6 +2190,7 @@ function ProfileTab({profile,setProfile,leaves,onReset,setAuthState,setLeaves,se
   const isGomshin=profile.userType==="gomshin";
   const rankInfo=isGomshin?null:calcRankInfo(profile.enlist,profile.missedMonths);
   const [showRankEdit,setShowRankEdit]=useState(false);
+  const [previewPromo,setPreviewPromo]=useState(false);
   const [editMissed,setEditMissed]=useState({...(profile.missedMonths||{이등병:0,일병:0,상병:0})});
   const saveRankEdit=()=>{setProfile(p=>({...p,missedMonths:editMissed}));setShowRankEdit(false);};
   return(
@@ -2121,7 +2214,10 @@ function ProfileTab({profile,setProfile,leaves,onReset,setAuthState,setLeaves,se
         <div style={S.card}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
             <div style={{fontSize:14,fontWeight:700}}>🪖 진급 스케줄</div>
-            <button onClick={()=>setShowRankEdit(true)} style={{fontSize:12,color:"#3182F6",fontWeight:700,background:"#EBF3FF",border:"none",borderRadius:8,padding:"5px 10px",cursor:"pointer"}}>수정</button>
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={()=>setPreviewPromo(true)} style={{fontSize:12,color:"#8B6F00",fontWeight:700,background:"#FFF6D9",border:"none",borderRadius:8,padding:"5px 10px",cursor:"pointer"}}>🎉 축하카드</button>
+              <button onClick={()=>setShowRankEdit(true)} style={{fontSize:12,color:"#3182F6",fontWeight:700,background:"#EBF3FF",border:"none",borderRadius:8,padding:"5px 10px",cursor:"pointer"}}>수정</button>
+            </div>
           </div>
           {RANK_LABELS.map((r,i)=>{
             const isLast=i===RANK_LABELS.length-1;const isCurrent=r===rankInfo.currentRank;
@@ -2171,6 +2267,7 @@ function ProfileTab({profile,setProfile,leaves,onReset,setAuthState,setLeaves,se
       <ServiceTimeline profile={profile} rankInfo={rankInfo} leaves={leaves}/>
       {!isGomshin&&<SalaryCalc rankInfo={rankInfo} profile={profile}/>}
       <DdayShareCard profile={profile} rankInfo={rankInfo}/>
+      <AddToHomeGuide/>
 
       <div style={{display:"flex",gap:8,marginTop:8,justifyContent:"center"}}>
         <button onClick={async()=>{
@@ -2211,6 +2308,7 @@ function ProfileTab({profile,setProfile,leaves,onReset,setAuthState,setLeaves,se
           </div>
         </div>
       )}
+      {previewPromo&&rankInfo&&<PromotionCard profile={profile} rank={rankInfo.currentRank} hobon={rankInfo.hobon} onClose={()=>setPreviewPromo(false)}/>}
     </div>
   );
 }
@@ -2642,23 +2740,48 @@ function DdayShareCard({profile,rankInfo}){
     const grad=ctx.createLinearGradient(0,0,900,1100);const colors={army:["#3D5A1E","#556B2F","#8FA47A"],pink:["#FF4081","#E91E8C","#C2185B"],dark:["#1A1A2E","#16213E","#0F3460"]}[cardStyle];
     grad.addColorStop(0,colors[0]);grad.addColorStop(.5,colors[1]);grad.addColorStop(1,colors[2]);ctx.fillStyle=grad;ctx.fillRect(0,0,900,1100);
     ctx.fillStyle="rgba(255,255,255,0.05)";ctx.beginPath();ctx.arc(750,150,260,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(-50,950,200,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle="rgba(255,255,255,0.9)";ctx.font="bold 32px sans-serif";ctx.textAlign="left";ctx.fillText("🐻 휴곰",80,105);
-    ctx.fillStyle="rgba(255,255,255,0.55)";ctx.font="22px sans-serif";ctx.fillText("군인과 곰신의 휴가 관리 서비스",80,145);
-    ctx.fillStyle="#fff";ctx.font="bold 52px sans-serif";ctx.fillText(profile.name+(isGomshin?" 곰신":""),80,240);
-    if(!isGomshin&&rank){ctx.fillStyle="rgba(255,255,255,0.7)";ctx.font="bold 30px sans-serif";ctx.fillText(`${rank} ${hobon}호봉 · 공군`,80,285);}
-    ctx.strokeStyle="rgba(255,255,255,0.2)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(80,310);ctx.lineTo(820,310);ctx.stroke();
-    ctx.font="180px serif";ctx.textAlign="center";ctx.fillStyle="#fff";ctx.fillText(isGomshin?"🧸":"🐻",720,520);
-    ctx.fillStyle="rgba(255,255,255,0.2)";ctx.font="bold 240px sans-serif";ctx.textAlign="left";ctx.fillText("D-",60,590);
-    ctx.fillStyle="#fff";ctx.font="bold 220px sans-serif";ctx.fillText(String(left),220,590);
-    ctx.fillStyle="rgba(255,255,255,0.18)";ctx.beginPath();ctx.roundRect(60,620,420,64,16);ctx.fill();
-    ctx.fillStyle="#fff";ctx.font="bold 28px sans-serif";ctx.textAlign="center";ctx.fillText(`📅 ${profile.discharge} 전역예정`,270,662);
-    ctx.fillStyle="rgba(255,255,255,0.15)";ctx.beginPath();ctx.roundRect(60,720,780,90,20);ctx.fill();
-    ctx.fillStyle="rgba(255,255,255,0.9)";ctx.font="bold 24px sans-serif";ctx.textAlign="left";ctx.fillText(`복무 ${pct}% 완료 (${served}일 / ${total}일)`,80,775);
-    ctx.fillStyle="rgba(255,255,255,0.2)";ctx.beginPath();ctx.roundRect(60,800,780,16,8);ctx.fill();
-    ctx.fillStyle="rgba(255,255,255,0.85)";ctx.beginPath();ctx.roundRect(60,800,Math.max(16,780*(pct/100)),16,8);ctx.fill();
-    ctx.fillStyle="#FFD700";ctx.beginPath();ctx.arc(60+780*(pct/100),808,10,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle="rgba(255,255,255,0.4)";ctx.font="20px sans-serif";ctx.textAlign="center";ctx.fillText("#휴곰 #군복무 #전역카운트",450,900);
-    ctx.fillStyle="rgba(255,255,255,0.3)";ctx.font="18px sans-serif";ctx.textAlign="right";ctx.fillText(today+" 기준 · 휴곰 앱",840,960);
+
+    // 헤더
+    ctx.textBaseline="alphabetic";
+    ctx.fillStyle="rgba(255,255,255,0.9)";ctx.font="bold 32px sans-serif";ctx.textAlign="left";ctx.fillText("🐻 휴곰",70,105);
+    ctx.fillStyle="rgba(255,255,255,0.55)";ctx.font="22px sans-serif";ctx.fillText("군인과 곰신의 휴가 관리 서비스",70,145);
+
+    // 이름 · 계급
+    ctx.fillStyle="#fff";ctx.font="bold 50px sans-serif";ctx.fillText(profile.name+(isGomshin?" 곰신":""),70,238);
+    if(!isGomshin&&rank){ctx.fillStyle="rgba(255,255,255,0.7)";ctx.font="bold 28px sans-serif";ctx.fillText(`${rank} ${hobon}호봉 · 공군`,70,280);}
+    ctx.strokeStyle="rgba(255,255,255,0.2)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(70,312);ctx.lineTo(830,312);ctx.stroke();
+
+    // "전역까지" 라벨
+    ctx.fillStyle="rgba(255,255,255,0.6)";ctx.font="bold 26px sans-serif";ctx.textAlign="left";ctx.fillText("전역까지",70,368);
+
+    // D-day 숫자: 자릿수에 상관없이(1~4자리) 곰 이모지와 절대 겹치지 않도록 실측 후 배치
+    const ddayText=`D-${left}`;
+    let ddaySize=180;
+    ctx.font=`900 ${ddaySize}px sans-serif`;
+    const maxDdayWidth=520; // 이 폭을 넘으면 곰 이모지 자리를 침범하므로 폰트를 줄임
+    while(ctx.measureText(ddayText).width>maxDdayWidth&&ddaySize>90){ ddaySize-=6; ctx.font=`900 ${ddaySize}px sans-serif`; }
+    const ddayWidth=ctx.measureText(ddayText).width;
+    ctx.fillStyle="#fff";ctx.fillText(ddayText,70,500);
+
+    // 곰 이모지: D-day 숫자 실제 렌더 폭 뒤에 안전 간격을 두고 배치
+    const bearX=Math.min(70+ddayWidth+50,760);
+    ctx.font="140px serif";ctx.textAlign="left";ctx.fillText(isGomshin?"🧸":"🐻",bearX,470);
+
+    // 전역 예정일 배지
+    ctx.fillStyle="rgba(255,255,255,0.18)";ctx.beginPath();ctx.roundRect(70,560,420,64,16);ctx.fill();
+    ctx.fillStyle="#fff";ctx.font="bold 28px sans-serif";ctx.textAlign="center";ctx.fillText(`📅 ${profile.discharge} 전역예정`,280,602);
+
+    // 복무 진행률 카드
+    ctx.fillStyle="rgba(255,255,255,0.15)";ctx.beginPath();ctx.roundRect(70,660,760,150,20);ctx.fill();
+    ctx.fillStyle="rgba(255,255,255,0.9)";ctx.font="bold 24px sans-serif";ctx.textAlign="left";ctx.fillText(`복무 ${pct}% 완료 (${served}일 / ${total}일)`,95,715);
+    ctx.fillStyle="rgba(255,255,255,0.2)";ctx.beginPath();ctx.roundRect(95,740,710,16,8);ctx.fill();
+    ctx.fillStyle="rgba(255,255,255,0.85)";ctx.beginPath();ctx.roundRect(95,740,Math.max(16,710*(pct/100)),16,8);ctx.fill();
+    ctx.fillStyle="#FFD700";ctx.beginPath();ctx.arc(95+710*(pct/100),748,10,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="rgba(255,255,255,0.55)";ctx.font="18px sans-serif";ctx.textAlign="left";ctx.fillText(profile.enlist,95,790);
+    ctx.textAlign="right";ctx.fillText(profile.discharge,805,790);
+
+    // 하단 브랜딩(해시태그 없이 날짜·앱 이름만)
+    ctx.fillStyle="rgba(255,255,255,0.35)";ctx.font="18px sans-serif";ctx.textAlign="center";ctx.fillText(today+" 기준 · 휴곰 앱",450,1030);
   };
   const generateImage=()=>{
     const canvas=document.createElement("canvas");canvas.width=900;canvas.height=1100;const ctx=canvas.getContext("2d");
@@ -2732,6 +2855,51 @@ function DdayShareCard({profile,rankInfo}){
             <button onClick={handleCopyText} style={{flex:1,padding:"13px 8px",background:copied?"#05C072":"#F2F4F6",color:copied?"#fff":"#4E5968",borderRadius:12,border:"none",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><span>{copied?"✓":"📋"}</span><span>{copied?"복사됨":"텍스트 복사"}</span></button>
           </div>
           <div style={{textAlign:"center",fontSize:11,color:"#B0B8C1"}}>🐻 저장 버튼을 누르면 공유 시트가 열려요. "이미지 저장"을 선택하면 갤러리에 바로 저장돼요!</div>
+        </div>
+      )}
+    </div>
+  );
+}
+function AddToHomeGuide(){
+  const [open,setOpen]=useState(false);
+  const isIOSDevice = typeof navigator!=="undefined" && /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const [os,setOs]=useState(isIOSDevice?"ios":"android");
+  const Step=({n,children})=>(
+    <div style={{display:"flex",gap:10,marginBottom:12}}>
+      <div style={{flexShrink:0,width:22,height:22,borderRadius:"50%",background:"#556B2F",color:"#fff",fontSize:12,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{n}</div>
+      <div style={{fontSize:13,color:"#333D4B",lineHeight:1.6,paddingTop:1}}>{children}</div>
+    </div>
+  );
+  return(
+    <div style={S.card}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:open?14:0}}>
+        <div><div style={{fontSize:14,fontWeight:700}}>📱 앱처럼 편하게 쓰기</div>{!open&&<div style={{fontSize:12,color:"#8B95A1",marginTop:2}}>홈 화면에 추가하면 앱처럼 바로 실행돼요</div>}</div>
+        <button onClick={()=>setOpen(o=>!o)} style={{fontSize:12,color:"#556B2F",fontWeight:700,background:"#F2E7D5",border:"none",borderRadius:8,padding:"5px 10px",cursor:"pointer"}}>{open?"접기":"방법 보기"}</button>
+      </div>
+      {open&&(
+        <div>
+          <div style={{fontSize:12,color:"#8B95A1",marginBottom:14,lineHeight:1.6}}>홈 화면에 추가해두면 매번 검색하거나 주소를 입력하지 않아도, 아이콘 터치 한 번으로 앱처럼 바로 열 수 있어요.</div>
+          <div style={{display:"flex",gap:7,marginBottom:16}}>
+            <button onClick={()=>setOs("ios")} style={{flex:1,padding:"9px 4px",borderRadius:10,border:`2px solid ${os==="ios"?"#556B2F":"#E8ECF0"}`,background:os==="ios"?"#556B2F":"#F9FAFB",fontSize:12,fontWeight:700,color:os==="ios"?"#fff":"#8B95A1",cursor:"pointer"}}>🍎 아이폰</button>
+            <button onClick={()=>setOs("android")} style={{flex:1,padding:"9px 4px",borderRadius:10,border:`2px solid ${os==="android"?"#556B2F":"#E8ECF0"}`,background:os==="android"?"#556B2F":"#F9FAFB",fontSize:12,fontWeight:700,color:os==="android"?"#fff":"#8B95A1",cursor:"pointer"}}>🤖 안드로이드(갤럭시)</button>
+          </div>
+          {os==="ios"?(
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:"#8B95A1",marginBottom:10}}>사파리(Safari) 기준</div>
+              <Step n={1}>사파리로 휴곰 사이트를 연 상태에서, 화면 <b>아래쪽 가운데</b>에 있는 공유 아이콘(네모 위에 화살표 ⬆️)을 눌러요.</Step>
+              <Step n={2}>메뉴를 <b>위로 스크롤</b>해서 <b>"홈 화면에 추가"</b>를 찾아 눌러요. (바로 안 보이면 아래로 더 내려보세요)</Step>
+              <Step n={3}>이름을 확인하고 오른쪽 위 <b>"추가"</b>를 누르면 완료! 홈 화면에 휴곰 아이콘이 생겨요.</Step>
+              <div style={{fontSize:11,color:"#B0B8C1",marginTop:4}}>※ 크롬 앱으로 접속했다면, 주소창 오른쪽 공유 아이콘 → 위로 스크롤 → "홈 화면에 추가"도 동일하게 됩니다.</div>
+            </div>
+          ):(
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:"#8B95A1",marginBottom:10}}>크롬(Chrome) 기준 — 갤럭시도 대부분 동일</div>
+              <Step n={1}>크롬으로 휴곰 사이트를 연 상태에서, 화면 <b>오른쪽 위</b> 점 3개(⋮) 메뉴를 눌러요.</Step>
+              <Step n={2}><b>"홈 화면에 추가"</b> 또는 <b>"앱 설치"</b>를 눌러요.</Step>
+              <Step n={3}>이름을 확인하고 <b>"추가"</b>를 누르면 완료! 홈 화면에 휴곰 아이콘이 생겨요.</Step>
+              <div style={{fontSize:11,color:"#B0B8C1",marginTop:4}}>※ 삼성인터넷 브라우저라면, 하단 메뉴(≡) → "현재 페이지 추가" → "홈 화면"으로 같은 결과를 얻을 수 있어요.</div>
+            </div>
+          )}
         </div>
       )}
     </div>
