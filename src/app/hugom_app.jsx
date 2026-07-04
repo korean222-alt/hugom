@@ -215,7 +215,12 @@ function PromotionCard({ profile, rank, hobon, onClose }) {
     ctx.fillStyle = haloGrad; ctx.beginPath(); ctx.arc(W/2, 780, 280, 0, Math.PI*2); ctx.fill();
 
     // 마스코트
-    ctx.font = "340px serif"; ctx.fillText(profile.userType === "gomshin" ? "🧸" : "🐻", W / 2, 920);
+    ctx.save();
+    ctx.translate(W / 2, 920);
+    ctx.scale(2.3, 2.3); // 140px 기준으로 그린 뒤 확대 — 큰 폰트로 직접 그리면 일부 브라우저(iOS Safari 등)에서 이모지가 컬러가 아닌 단색 실루엣으로 깨짐
+    ctx.font = "140px serif";
+    ctx.fillText(profile.userType === "gomshin" ? "🧸" : "🐻", 0, 0);
+    ctx.restore();
 
     // 헤드라인 — 계급명 길이(이등병 vs 병장)에 관계없이 폭에 맞춰 자동 축소
     const headline = `${rank} 진급을 축하해요!`;
