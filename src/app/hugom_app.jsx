@@ -844,9 +844,9 @@ export default function App() {
         supabase.from("leaves").select("*").eq("user_id", profile.id).order("start_date"),
         supabase.from("schedules").select("*").eq("user_id", profile.id).order("date"),
         supabase.from("notifications").select("*").eq("user_id", profile.id).order("created_at", { ascending: false }),
-        supabase.from("letters").select("*").eq("receiver_id", profile.id).order("created_at", { ascending: false }),
+        supabase.from("letters").select("*").or(`sender_id.eq.${profile.id},receiver_id.eq.${profile.id}`).order("created_at", { ascending: false }),
       ]);
-      if (lt.data) setLetters(lt.data.map(l => ({ id: l.id, senderId: l.sender_id, content: l.content, read: l.is_read, createdAt: l.created_at })));
+      if (lt.data) setLetters(lt.data.map(l => ({ id: l.id, senderId: l.sender_id, receiverId: l.receiver_id, content: l.content, read: l.is_read, createdAt: l.created_at, direction: l.sender_id === profile.id ? "sent" : "received" })));
       if (lv.data) setLeaves(lv.data.map(l => ({
         id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo,
       })));
@@ -1017,7 +1017,7 @@ export default function App() {
         filter: `receiver_id=eq.${profile.id}`,
       }, (payload) => {
         const l = payload.new;
-        setLetters(prev => prev.some(x => x.id === l.id) ? prev : [{ id: l.id, senderId: l.sender_id, content: l.content, read: l.is_read, createdAt: l.created_at }, ...prev]);
+        setLetters(prev => prev.some(x => x.id === l.id) ? prev : [{ id: l.id, senderId: l.sender_id, receiverId: l.receiver_id, content: l.content, read: l.is_read, createdAt: l.created_at, direction: "received" }, ...prev]);
       })
       .subscribe();
 
@@ -1170,15 +1170,17 @@ export default function App() {
     if (!profile?.id || !receiverId || !content?.trim()) return { success: false };
     const forbidden = checkForbidden(content);
     if (forbidden) return { success: false, reason: `보안 위험 단어("${forbidden}")가 포함되어 있어요. 수정 후 다시 보내주세요.` };
-    const { error } = await supabase.from("letters").insert({ sender_id: profile.id, receiver_id: receiverId, content: content.trim() });
+    // 보낸 사람은 본인 편지를 조회할 권한이 있으므로(.select 안전) 즉시 로컬 반영
+    const { data, error } = await supabase.from("letters").insert({ sender_id: profile.id, receiver_id: receiverId, content: content.trim() }).select().single();
     if (error) { console.error("편지 전송 실패:", error); return { success: false, reason: "편지 전송에 실패했어요. 잠시 후 다시 시도해주세요." }; }
+    if (data) setLetters(prev => [{ id: data.id, senderId: data.sender_id, receiverId: data.receiver_id, content: data.content, read: data.is_read, createdAt: data.created_at, direction: "sent" }, ...prev]);
     addNotif({ type: "letter", text: `${profile.name}님이 편지를 보냈어요 💌`, recipientId: receiverId });
     return { success: true };
   };
 
   const markLettersRead = async () => {
     if (!profile?.id) return;
-    setLetters(prev => prev.map(l => ({ ...l, read: true })));
+    setLetters(prev => prev.map(l => l.direction === "received" ? { ...l, read: true } : l));
     await supabase.from("letters").update({ is_read: true }).eq("receiver_id", profile.id).eq("is_read", false);
   };
 
@@ -2118,10 +2120,14 @@ function HomeDashboard({profile, friends, myLeaves, mySchedules, perfDates, noti
   // 편지함
   const [showLetters, setShowLetters] = useState(false);
   const [letterText, setLetterText] = useState("");
-  const unreadLetters = (letters || []).filter(l => !l.read).length;
-  const nameOf = (senderId) => (friends || []).find(f => f.id === senderId)?.name || "상대";
+  const [letterTab, setLetterTab] = useState("received");
+  const receivedLetters = (letters || []).filter(l => l.direction !== "sent");
+  const sentLetters = (letters || []).filter(l => l.direction === "sent");
+  const unreadLetters = receivedLetters.filter(l => !l.read).length;
+  const nameOf = (id) => (friends || []).find(f => f.id === id)?.name || "상대";
   const letterTarget = (sel && sel.kind === "friend") ? sel : (friends || [])[0] || null;
   const openLetters = () => { setShowLetters(true); if (unreadLetters > 0) onMarkLettersRead && onMarkLettersRead(); };
+  const shownLetters = letterTab === "sent" ? sentLetters : receivedLetters;
   const sendLetter = async () => {
     if (!letterTarget || !letterText.trim()) return;
     const res = await onSendLetter(letterTarget.id, letterText.trim());
@@ -2244,7 +2250,7 @@ function HomeDashboard({profile, friends, myLeaves, mySchedules, perfDates, noti
         <div style={{flex:1, minWidth:0}}>
           <div style={{fontSize:14, fontWeight:800, color:"#191F28"}}>편지함</div>
           <div style={{fontSize:12, color:"#8B95A1", marginTop:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
-            {(letters || []).length === 0 ? "친구에게 마음을 담은 편지를 남겨보세요" : unreadLetters > 0 ? `읽지 않은 편지 ${unreadLetters}통` : `${nameOf(letters[0].senderId)}님: ${letters[0].content}`}
+            {(letters || []).length === 0 ? "친구에게 마음을 담은 편지를 남겨보세요" : unreadLetters > 0 ? `읽지 않은 편지 ${unreadLetters}통` : receivedLetters[0] ? `${nameOf(receivedLetters[0].senderId)}님: ${receivedLetters[0].content}` : `보낸 편지 ${sentLetters.length}통`}
           </div>
         </div>
         <span style={{fontSize:18, color:"#D0D8E0"}}>›</span>
@@ -2281,19 +2287,23 @@ function HomeDashboard({profile, friends, myLeaves, mySchedules, perfDates, noti
               <div style={{background:"#F9FAFB", borderRadius:12, padding:"12px 14px", marginBottom:16, fontSize:12.5, color:"#8B95A1", lineHeight:1.6}}>연결된 친구가 있어야 편지를 보낼 수 있어요. 먼저 연결해보세요.</div>
             )}
 
-            {/* 받은 편지 목록 */}
-            <div style={{fontSize:12, fontWeight:700, color:"#8B95A1", marginBottom:8}}>받은 편지 {(letters || []).length > 0 ? `(${letters.length})` : ""}</div>
-            {(letters || []).length === 0 ? (
+            {/* 받은/보낸 탭 */}
+            <div style={{display:"flex", gap:6, marginBottom:12}}>
+              {[{id:"received", label:`받은 편지 ${receivedLetters.length}`}, {id:"sent", label:`보낸 편지 ${sentLetters.length}`}].map(t => (
+                <button key={t.id} onClick={()=>setLetterTab(t.id)} style={{flex:1, padding:"9px 4px", borderRadius:10, border:"none", fontSize:13, fontWeight:700, cursor:"pointer", background:letterTab===t.id?T.accent:"#F2F4F6", color:letterTab===t.id?"#fff":"#8B95A1"}}>{t.label}</button>
+              ))}
+            </div>
+            {shownLetters.length === 0 ? (
               <div style={{textAlign:"center", padding:"36px 0", color:"#B0B8C1"}}>
                 <div style={{fontSize:32, marginBottom:8}}>📭</div>
-                <div style={{fontSize:13, fontWeight:600}}>아직 받은 편지가 없어요</div>
+                <div style={{fontSize:13, fontWeight:600}}>{letterTab === "sent" ? "아직 보낸 편지가 없어요" : "아직 받은 편지가 없어요"}</div>
               </div>
             ) : (
               <div style={{display:"flex", flexDirection:"column", gap:8, marginBottom:8}}>
-                {letters.map(l => (
+                {shownLetters.map(l => (
                   <div key={l.id} style={{background:"#F9FAFB", borderRadius:14, padding:"12px 14px", border:"1px solid #F0F2F5"}}>
                     <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5}}>
-                      <span style={{fontSize:12.5, fontWeight:800, color:T.accent}}>💌 {nameOf(l.senderId)}님</span>
+                      <span style={{fontSize:12.5, fontWeight:800, color:T.accent}}>{letterTab === "sent" ? `↗ ${nameOf(l.receiverId)}님에게` : `💌 ${nameOf(l.senderId)}님`}</span>
                       <span style={{fontSize:10.5, color:"#B0B8C1"}}>{l.createdAt ? fmtDate(toKey(new Date(l.createdAt))) : ""}</span>
                     </div>
                     <div style={{fontSize:13.5, color:"#333", lineHeight:1.6, whiteSpace:"pre-wrap", wordBreak:"break-word"}}>{l.content}</div>
