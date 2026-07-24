@@ -1019,13 +1019,13 @@ export default function App() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [profile?.id]);
 
-  // 곰신은 첫 진입 시 감성 홈(home) 탭으로 시작 (한 번만, 이후 이동엔 관여 안 함)
+  // 첫 진입 시 홈 탭으로 시작 (곰신·군화 공통, 한 번만, 이후 이동엔 관여 안 함)
   useEffect(() => {
     if (profile?.id && !didInitTabRef.current) {
       didInitTabRef.current = true;
-      if (profile.userType === "gomshin") setTab("home");
+      setTab("home");
     }
-  }, [profile?.id, profile?.userType]);
+  }, [profile?.id]);
 
   // 무료 플랜 Realtime이 끊겨도 곰신의 연결 수락이 반영되도록:
   // "아직 연결된 상대가 없는 동안"에만 25초 간격으로 가볍게 재확인 → 연결되는 순간 멈춤(폴링 상시화 방지)
@@ -1339,8 +1339,8 @@ export default function App() {
   // 로그인 + 프로필 있음 → 메인 앱
   const isGomshin=profile.userType==="gomshin";
   const partner=friends.find(f=>f.id===viewingFriendId)||null;
-  // 곰신 홈에서 쓸 "연결된 군화" (여러 명이어도 첫 군화 우선)
-  const connectedSoldier=friends.find(f=>f.userType==="soldier")||friends[0]||null;
+  // 홈에서 쓸 "대표 연결 상대" — 나와 반대 유형(곰신↔군화)을 우선, 없으면 첫 친구
+  const homePartner=friends.find(f=>f.userType!==profile.userType)||friends[0]||null;
   // calView: "mine" | "partner" — 곰신/군화 공통으로 토글 가능 (상단 state 선언 참조)
   const showingPartner=calView==="partner"&&!!partner;
   const calLeaves=showingPartner?(partner.leaves||[]):leaves;
@@ -1351,8 +1351,8 @@ export default function App() {
   const calProfile=showingPartner?partner:profile;
   const isReadOnly=showingPartner;
   const tabs=isGomshin
-    ?[{id:"home",icon:"💗",label:"홈"},{id:"cal",icon:"📅",label:"달력"},{id:"friends",icon:"💝",label:"연결"},{id:"profile",icon:"⚙️",label:"내 정보"}]
-    :[{id:"cal",icon:"📅",label:"달력"},{id:"leave",icon:"🏖️",label:"휴가"},{id:"friends",icon:"👥",label:"친구"},{id:"profile",icon:"⚙️",label:"내 정보"}];
+    ?[{id:"home",icon:"🏠",label:"홈"},{id:"cal",icon:"📅",label:"달력"},{id:"friends",icon:"💝",label:"연결"},{id:"profile",icon:"⚙️",label:"내 정보"}]
+    :[{id:"home",icon:"🏠",label:"홈"},{id:"cal",icon:"📅",label:"달력"},{id:"leave",icon:"🏖️",label:"휴가"},{id:"friends",icon:"👥",label:"친구"},{id:"profile",icon:"⚙️",label:"내 정보"}];
 
   return (
     <div style={S.wrap}>
@@ -1373,7 +1373,7 @@ export default function App() {
       {warnMsg&&<WarnModal msg={warnMsg} onClose={()=>setWarnMsg("")}/>}
       {promoRankInfo&&<PromotionCard profile={profile} rank={promoRankInfo.rank} hobon={promoRankInfo.hobon} onClose={()=>setPromoRankInfo(null)}/>}
       <div style={S.content}>
-        {tab==="home"&&isGomshin&&<GomshinHome profile={profile} partner={connectedSoldier} notifs={notifs} onAccept={acceptConnection} onPoke={poke} onGoConnect={()=>handleTabChange("friends")} onViewPartnerCal={(id)=>{setViewingFriendId(id);setCalView("partner");setTab("cal");}}/>}
+        {tab==="home"&&<HomeDashboard profile={profile} partner={homePartner} myLeaves={leaves} mySchedules={schedules} perfDates={perfDates} notifs={notifs} onAccept={acceptConnection} onPoke={poke} onGoConnect={()=>handleTabChange("friends")} onViewPartnerCal={(id)=>{setViewingFriendId(id);setCalView("partner");setTab("cal");}}/>}
         {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} perfDates={calOutingDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} partner={partner} calView={calView} setCalView={setCalView} onAddNotif={addNotif} myName={profile.name}/>}
         {tab==="leave"&&!isGomshin&&<LeaveTab profile={profile} leaves={leaves} perfDates={perfDates} onAddLeave={addLeave} onDelLeave={delLeave}/>}
         {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setViewingFriendId(id);setCalView("partner");setTab("cal");}} onAddNotif={addNotif} onDisconnect={disconnectPartner} onPoke={poke} onAccept={acceptConnection}/>}
@@ -1627,11 +1627,11 @@ function CalendarTab({profile,leaves,schedules,perfDates,onAddLeave,onDelLeave,o
     <div>
       {toastMsg&&<div style={{position:"fixed",top:68,left:"50%",transform:"translateX(-50%)",background:"#191F28",color:"#fff",padding:"10px 20px",borderRadius:100,fontSize:13,fontWeight:600,zIndex:200,whiteSpace:"nowrap"}}>{toastMsg}</div>}
       <div style={{padding:"16px 16px 0"}}>
-        <div style={{background:isGomshin?"linear-gradient(135deg,#FF4081,#E91E8C)":"linear-gradient(135deg,#2D4A1E,#556B2F)",borderRadius:20,padding:"18px 20px",boxShadow:isGomshin?"0 4px 16px rgba(233,30,140,.28)":"0 4px 16px rgba(61,90,30,.35)"}}>
+        <div style={{background:profile.userType==="gomshin"?"linear-gradient(135deg,#C2185B,#8E2C57)":"linear-gradient(135deg,#2D4A1E,#556B2F)",borderRadius:20,padding:"18px 20px",boxShadow:profile.userType==="gomshin"?"0 4px 16px rgba(194,24,91,.26)":"0 4px 16px rgba(61,90,30,.35)"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
             <div>
-              <div style={{fontSize:11,color:"rgba(255,255,255,.65)",fontWeight:600,marginBottom:4}}>전역까지</div>
-              <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{fontSize:42,fontWeight:900,color:"#fff",lineHeight:1}}>D-{diffDays(todayKey,profile.discharge)}</div><div style={{fontSize:28}}>🐻</div></div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,.65)",fontWeight:600,marginBottom:4}}>{readOnly?`${profile.name}님 전역까지`:"전역까지"}</div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{fontSize:42,fontWeight:900,color:"#fff",lineHeight:1}}>D-{diffDays(todayKey,profile.discharge)}</div><div style={{fontSize:28}}>{profile.userType==="gomshin"?"🐻":"🎖️"}</div></div>
               <div style={{fontSize:12,color:"rgba(255,255,255,.6)",marginTop:6}}>{profile.discharge} 전역예정</div>
             </div>
             {nextOuting&&(<div style={{textAlign:"right",background:"rgba(255,255,255,.15)",borderRadius:12,padding:"10px 14px"}}><div style={{fontSize:10,color:"rgba(255,255,255,.65)",marginBottom:4}}>다음 외박</div><div style={{fontSize:13,fontWeight:700,color:"#FFD966"}}>{nextOuting.start}</div><div style={{fontSize:11,color:"rgba(255,255,255,.5)"}}>D-{Math.max(0,diffDays(todayKey,nextOuting.start))}일 후</div></div>)}
@@ -1997,10 +1997,10 @@ function LeaveCard({leave,onDelete,past}){
   return(<div style={{background:past?"#F9FAFB":lt.bg,borderRadius:16,padding:"14px 16px",border:`1px solid ${past?"#E8ECF0":lt.border}`,marginBottom:8,display:"flex",alignItems:"center",gap:12}}><div style={{width:42,height:42,borderRadius:12,background:past?"#E8ECF0":lt.color+"22",border:`1.5px solid ${past?"#D1D6DB":lt.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{lt.icon}</div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:past?"#8B95A1":lt.color}}>{lt.label}</div><div style={{fontSize:12,color:"#4E5968",marginTop:2}}>{leave.start_date} ~ {leave.end_date}</div><div style={{fontSize:11,color:"#B0B8C1"}}>{days}일{leave.memo?" · "+leave.memo:""}</div></div><button onClick={onDelete} style={{padding:"6px 10px",background:"rgba(240,68,82,.08)",border:"none",borderRadius:8,fontSize:12,color:"#F04452",fontWeight:700,cursor:"pointer"}}>삭제</button></div>);
 }
 
-// ===================== 친구 탭 (데모 로직 삭제, 실제 DB 연동만 유지) =====================
-// ===================== 곰신 홈 대시보드 (곰신 메인 화면) =====================
-function GomshinHome({profile, partner, notifs, onAccept, onPoke, onGoConnect, onViewPartnerCal}){
+// ===================== 홈 대시보드 (곰신·군화 공용 메인 화면) =====================
+function HomeDashboard({profile, partner, myLeaves, mySchedules, perfDates, notifs, onAccept, onPoke, onGoConnect, onViewPartnerCal}){
   const today = toKey(new Date());
+  const isGomshin = profile.userType === "gomshin";
   // 받은 연결요청 (알림 벨에만 묻히지 않도록 홈 최상단에 크게 노출)
   const pendingRequests = (notifs || []).filter(n => n.type === "connection_request" && n.senderId);
   const discharge = profile.discharge;
@@ -2010,56 +2010,71 @@ function GomshinHome({profile, partner, notifs, onAccept, onPoke, onGoConnect, o
   const served = (enlist && total) ? Math.min(total, Math.max(0, diffDays(enlist, today))) : null;
   const pct = (total && served != null && total > 0) ? Math.min(100, Math.round(served / total * 100)) : null;
 
+  // 테마: 곰신은 로즈, 군화는 밀리터리 그린 (하트 이모지 최소화)
+  const T = isGomshin
+    ? {accent:"#C2185B", heroGrad:"linear-gradient(150deg,#8E2C57 0%,#C2185B 100%)", heroShadow:"0 8px 24px rgba(194,24,91,.26)", softBg:"#FDF4F8", softBorder:"#F3D9E5", chipBg:"#FBEAF1", ctaGrad:"linear-gradient(135deg,#D75A8C,#C2185B)", heroEmoji:"🐻"}
+    : {accent:"#4C6C29", heroGrad:"linear-gradient(150deg,#2D4A1E 0%,#4E6B2A 100%)", heroShadow:"0 8px 24px rgba(61,90,30,.30)", softBg:"#F3F7EC", softBorder:"#DDE8CC", chipBg:"#EAF0DE", ctaGrad:"linear-gradient(135deg,#6B8E3D,#3D5A1E)", heroEmoji:"🎖️"};
+
   const leaveLabel = (t) => ({annual:"🌿 연가", reward:"🏅 포상휴가", perf:"⭐ 외박", consol:"💙 위로휴가", medical:"🏥 청원휴가"}[t] || "🌿 휴가");
   const schedLabel = (t) => ({visit_in:"🏠 영내면회", "영내면회":"🏠 영내면회", visit_out:"🚗 면회외출", "면회외출":"🚗 면회외출"}[t] || "📌 일정");
 
-  // 다음 만남 = 연결된 군화의 다가오는 휴가/외박/면회 중 가장 가까운 것
-  const nextMeet = useMemo(() => {
-    if (!partner) return null;
+  // 다음 일정 = 곰신이면 파트너(군화)의, 군화면 본인의 다가오는 휴가/외박/면회 중 가장 가까운 것
+  const nextItem = useMemo(() => {
     const items = [];
-    (partner.leaves || []).forEach(l => { if (l.start_date && l.start_date >= today) items.push({date:l.start_date, end:l.end_date, label:leaveLabel(l.leave_type)}); });
-    (partner.schedules || []).forEach(s => { if (s.event_date && s.event_date >= today) items.push({date:s.event_date, end:null, label:s.title || schedLabel(s.event_type)}); });
+    const lv = isGomshin ? (partner?.leaves || []) : (myLeaves || []);
+    const sc = isGomshin ? (partner?.schedules || []) : (mySchedules || []);
+    lv.forEach(l => { if (l.start_date && l.start_date >= today) items.push({date:l.start_date, end:l.end_date, label:leaveLabel(l.leave_type)}); });
+    sc.forEach(s => { if (s.event_date && s.event_date >= today) items.push({date:s.event_date, end:null, label:s.title || schedLabel(s.event_type)}); });
+    if (!isGomshin) (perfDates || []).forEach(p => { if (p.start >= today) items.push({date:p.start, end:p.end, label:"⭐ 외박"}); });
     items.sort((a,b) => a.date < b.date ? -1 : 1);
     return items[0] || null;
-  }, [partner, today]);
+  }, [isGomshin, partner, myLeaves, mySchedules, perfDates, today]);
 
-  const affirmations = [
-    "오늘도 하루가 줄었어요. 잘 기다리고 있어요 🐻",
-    "보고 싶은 마음, 곰이 대신 세어줄게요 🧸",
-    "함께할 시간이 기다림보다 길 거예요 💗",
-    "오늘 군화도 곰신 생각 하고 있을 거예요",
+  const affirmations = isGomshin ? [
+    "오늘도 하루가 줄었어요. 잘 기다리고 있어요",
+    "함께할 시간이 기다림보다 길 거예요",
+    "오늘 군화도 분명 생각하고 있을 거예요",
     "조금씩, 그리고 분명히 가까워지고 있어요",
-    "기다림도 사랑의 한 부분이에요 💌",
-    "오늘 하루도 씩씩하게, 곰신 파이팅!",
-    "다음 만남이 어제보다 한 뼘 더 가까워졌어요",
+    "기다림도 그 사람을 아끼는 마음이에요",
+    "오늘 하루도 씩씩하게 보내요",
+    "다음 만남이 어제보다 가까워졌어요",
+  ] : [
+    "전역이 하루 더 가까워졌다",
+    "오늘도 무사히, 잘 버티고 있다",
+    "시간은 확실히 네 편이다",
+    "여기까지 온 만큼, 남은 것도 줄었다",
+    "오늘 하루도 고생 많았어요",
+    "페이스 유지하자. 곧이다",
   ];
   const todayLine = affirmations[Math.floor(Date.now() / 86400000) % affirmations.length];
-  const soldierName = partner?.name || profile.name;
+  const soldierName = partner?.name || "군화";
+  const heroLabel = isGomshin ? `${soldierName}님 전역까지` : "전역까지";
+  const nextLabel = isGomshin ? "다음 만남까지" : "다음 휴가·외박까지";
 
   const wrap = {display:"flex", flexDirection:"column", gap:14, padding:16};
   return (
     <div className="su" style={wrap}>
-      {/* 받은 연결요청 배너 — 알림 벨에만 묻히지 않도록 홈 최상단에 노출 */}
+      {/* 받은 연결요청 배너 */}
       {pendingRequests.length > 0 && pendingRequests.map(req => (
-        <div key={req.id} className="shake" style={{borderRadius:18, padding:"16px 18px", background:"linear-gradient(135deg,#FFE29A,#FFC93C)", border:"1px solid #F0B429", display:"flex", alignItems:"center", gap:12}}>
-          <div style={{fontSize:30}}>💌</div>
+        <div key={req.id} className="shake" style={{borderRadius:18, padding:"16px 18px", background:"linear-gradient(135deg,#FFE7A8,#FFCE54)", border:"1px solid #F0B429", display:"flex", alignItems:"center", gap:12}}>
+          <div style={{fontSize:28}}>📨</div>
           <div style={{flex:1, minWidth:0}}>
             <div style={{fontSize:14, fontWeight:800, color:"#6B4E00"}}>새 연결 요청이 왔어요!</div>
             <div style={{fontSize:12, color:"#8A6D1B", marginTop:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{req.text}</div>
           </div>
-          <button onClick={()=>onAccept(req.senderId)} style={{flexShrink:0, padding:"9px 16px", borderRadius:12, border:"none", background:"#E91E8C", color:"#fff", fontSize:13, fontWeight:800, cursor:"pointer"}}>💝 수락</button>
+          <button onClick={()=>onAccept(req.senderId)} style={{flexShrink:0, padding:"9px 16px", borderRadius:12, border:"none", background:T.accent, color:"#fff", fontSize:13, fontWeight:800, cursor:"pointer"}}>수락</button>
         </div>
       ))}
 
       {/* 전역 D-day 히어로 */}
       {dLeft != null ? (
-        <div style={{borderRadius:22, padding:"22px 20px", background:"linear-gradient(150deg,#7A1F4B 0%,#C2185B 45%,#E91E8C 100%)", color:"#fff", position:"relative", overflow:"hidden", boxShadow:"0 8px 24px rgba(194,24,91,.28)"}}>
+        <div style={{borderRadius:22, padding:"22px 20px", background:T.heroGrad, color:"#fff", position:"relative", overflow:"hidden", boxShadow:T.heroShadow}}>
         <div style={{position:"absolute", top:-40, right:-30, width:150, height:150, borderRadius:"50%", background:"rgba(255,255,255,.08)"}}/>
         <div style={{position:"relative"}}>
-          <div style={{fontSize:12, fontWeight:700, color:"rgba(255,255,255,.85)"}}>{soldierName}님 전역까지</div>
+          <div style={{fontSize:12, fontWeight:700, color:"rgba(255,255,255,.85)"}}>{heroLabel}</div>
           <div style={{display:"flex", alignItems:"flex-end", gap:8, marginTop:4}}>
             <div style={{fontSize:52, fontWeight:900, lineHeight:1}}>D-{dLeft}</div>
-            <div style={{fontSize:26, marginBottom:4}}>🐻</div>
+            <div style={{fontSize:26, marginBottom:4}}>{T.heroEmoji}</div>
           </div>
           <div style={{fontSize:12, color:"rgba(255,255,255,.8)", marginTop:6}}>{fmtDate(discharge)} 전역 예정</div>
           {pct != null && (
@@ -2077,49 +2092,42 @@ function GomshinHome({profile, partner, notifs, onAccept, onPoke, onGoConnect, o
         </div>
       ) : (
         <div style={{...S.card, textAlign:"center", padding:"26px 20px"}}>
-          <div style={{fontSize:34, marginBottom:8}}>🐻</div>
-          <div style={{fontSize:15, fontWeight:800, color:"#191F28"}}>군화 전역 예정일을 알려주세요</div>
+          <div style={{fontSize:34, marginBottom:8}}>{T.heroEmoji}</div>
+          <div style={{fontSize:15, fontWeight:800, color:"#191F28"}}>{isGomshin ? "군화 전역 예정일을 알려주세요" : "전역 예정일을 알려주세요"}</div>
           <div style={{fontSize:12.5, color:"#8B95A1", marginTop:6, lineHeight:1.6}}>‘내 정보’ 탭에서 입대일·전역일을 입력하면<br/>여기에 전역 D-day가 매일 떠요.</div>
         </div>
       )}
 
       {/* 오늘의 한 줄 */}
-      <div style={{...S.card, display:"flex", alignItems:"center", gap:12, background:"#FFF5FA", boxShadow:"none", border:"1px solid #FBD6E8"}}>
-        <div style={{fontSize:24}}>💗</div>
-        <div style={{fontSize:13.5, fontWeight:700, color:"#C2185B", lineHeight:1.5}}>{todayLine}</div>
+      <div style={{...S.card, display:"flex", alignItems:"center", gap:12, background:T.softBg, boxShadow:"none", border:`1px solid ${T.softBorder}`}}>
+        <div style={{fontSize:22}}>☀️</div>
+        <div style={{fontSize:13.5, fontWeight:700, color:T.accent, lineHeight:1.5}}>{todayLine}</div>
       </div>
 
-      {/* 다음 만남 */}
-      {partner ? (
-        nextMeet ? (
-          <div onClick={()=>onViewPartnerCal(partner.id)} style={{...S.card, cursor:"pointer", display:"flex", alignItems:"center", gap:14}}>
-            <div style={{width:52, height:52, borderRadius:16, background:"#FFF0F8", display:"flex", alignItems:"center", justifyContent:"center", fontSize:26, flexShrink:0}}>💞</div>
-            <div style={{flex:1, minWidth:0}}>
-              <div style={{fontSize:11, fontWeight:700, color:"#E91E8C"}}>다음 만남까지</div>
-              <div style={{fontSize:20, fontWeight:900, color:"#191F28", lineHeight:1.2}}>D-{Math.max(0, diffDays(today, nextMeet.date))}</div>
-              <div style={{fontSize:12, color:"#8B95A1", marginTop:2}}>{nextMeet.label} · {fmtDate(nextMeet.date)}{nextMeet.end && nextMeet.end !== nextMeet.date ? ` ~ ${fmtDate(nextMeet.end)}` : ""}</div>
-            </div>
-            <div style={{fontSize:18, color:"#D0D8E0"}}>›</div>
+      {/* 다음 일정 */}
+      {nextItem && (
+        <div onClick={(isGomshin && partner) ? ()=>onViewPartnerCal(partner.id) : undefined} style={{...S.card, cursor:(isGomshin && partner) ? "pointer" : "default", display:"flex", alignItems:"center", gap:14}}>
+          <div style={{width:52, height:52, borderRadius:16, background:T.chipBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:26, flexShrink:0}}>📅</div>
+          <div style={{flex:1, minWidth:0}}>
+            <div style={{fontSize:11, fontWeight:700, color:T.accent}}>{nextLabel}</div>
+            <div style={{fontSize:20, fontWeight:900, color:"#191F28", lineHeight:1.2}}>D-{Math.max(0, diffDays(today, nextItem.date))}</div>
+            <div style={{fontSize:12, color:"#8B95A1", marginTop:2}}>{nextItem.label} · {fmtDate(nextItem.date)}{nextItem.end && nextItem.end !== nextItem.date ? ` ~ ${fmtDate(nextItem.end)}` : ""}</div>
           </div>
-        ) : (
-          <div style={{...S.card, textAlign:"center", padding:"22px 18px"}}>
-            <div style={{fontSize:28, marginBottom:6}}>📭</div>
-            <div style={{fontSize:14, fontWeight:700, color:"#191F28"}}>아직 예정된 휴가·면회가 없어요</div>
-            <div style={{fontSize:12, color:"#8B95A1", marginTop:5, marginBottom:14}}>군화에게 원하는 날짜로 제안해볼까요?</div>
-            <button onClick={onGoConnect} style={{...S.btn, background:"#E91E8C", color:"#fff", boxShadow:"none"}}>💌 휴가·면회 제안하기</button>
-          </div>
-        )
-      ) : (
-        <div style={{borderRadius:20, padding:"24px 20px", background:"linear-gradient(135deg,#FF7EB3,#E91E8C)", color:"#fff", textAlign:"center", boxShadow:"0 6px 20px rgba(233,30,140,.25)"}}>
-          <div style={{fontSize:34, marginBottom:8}}>💝</div>
-          <div style={{fontSize:16, fontWeight:800}}>군화와 연결해보세요</div>
-          <div style={{fontSize:12.5, color:"rgba(255,255,255,.9)", marginTop:6, lineHeight:1.6}}>연결하면 군화의 휴가·외박·면회 일정을<br/>함께 보고, 콕 찌르기로 마음도 전할 수 있어요.</div>
-          <button onClick={onGoConnect} style={{...S.btn, background:"#fff", color:"#E91E8C", marginTop:16, boxShadow:"none"}}>군화와 연결하기</button>
+          {(isGomshin && partner) && <div style={{fontSize:18, color:"#D0D8E0"}}>›</div>}
+        </div>
+      )}
+      {/* 곰신인데 연결됐지만 예정 일정이 없을 때 → 제안 유도 */}
+      {isGomshin && partner && !nextItem && (
+        <div style={{...S.card, textAlign:"center", padding:"22px 18px"}}>
+          <div style={{fontSize:26, marginBottom:6}}>🗓️</div>
+          <div style={{fontSize:14, fontWeight:700, color:"#191F28"}}>아직 예정된 휴가·면회가 없어요</div>
+          <div style={{fontSize:12, color:"#8B95A1", marginTop:5, marginBottom:14}}>군화에게 원하는 날짜로 제안해볼까요?</div>
+          <button onClick={onGoConnect} style={{...S.btn, background:T.accent, color:"#fff", boxShadow:"none"}}>휴가·면회 제안하기</button>
         </div>
       )}
 
-      {/* 빠른 상호작용 (연결됐을 때만) */}
-      {partner && (
+      {/* 연결 상태별 */}
+      {partner ? (
         <div style={{display:"flex", gap:10}}>
           <button onClick={()=>onPoke(partner.id)} style={{flex:1, padding:"14px 10px", borderRadius:16, border:"none", cursor:"pointer", background:"linear-gradient(135deg,#FF9500,#FF6B00)", color:"#fff", fontSize:13.5, fontWeight:800, display:"flex", flexDirection:"column", alignItems:"center", gap:3}}>
             <span style={{fontSize:20}}>👉</span>
@@ -2127,8 +2135,15 @@ function GomshinHome({profile, partner, notifs, onAccept, onPoke, onGoConnect, o
           </button>
           <button onClick={()=>onViewPartnerCal(partner.id)} style={{flex:1, padding:"14px 10px", borderRadius:16, border:"none", cursor:"pointer", background:"#F2F4F6", color:"#4E5968", fontSize:13.5, fontWeight:800, display:"flex", flexDirection:"column", alignItems:"center", gap:3}}>
             <span style={{fontSize:20}}>📅</span>
-            군화 달력
+            {partner.name}님 달력
           </button>
+        </div>
+      ) : (
+        <div style={{borderRadius:20, padding:"24px 20px", background:T.ctaGrad, color:"#fff", textAlign:"center", boxShadow:T.heroShadow}}>
+          <div style={{fontSize:30, marginBottom:8}}>{isGomshin ? "🔗" : "🤝"}</div>
+          <div style={{fontSize:16, fontWeight:800}}>{isGomshin ? "군화와 연결해보세요" : "곰신·전우와 연결해보세요"}</div>
+          <div style={{fontSize:12.5, color:"rgba(255,255,255,.9)", marginTop:6, lineHeight:1.6}}>연결하면 서로의 휴가·외박·면회 일정을<br/>함께 보고, 콕 찌르기로 안부도 전할 수 있어요.</div>
+          <button onClick={onGoConnect} style={{...S.btn, background:"#fff", color:T.accent, marginTop:16, boxShadow:"none"}}>연결하러 가기</button>
         </div>
       )}
     </div>
