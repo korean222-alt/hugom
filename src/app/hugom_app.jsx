@@ -1184,6 +1184,12 @@ export default function App() {
     await supabase.from("letters").update({ is_read: true }).eq("receiver_id", profile.id).eq("is_read", false);
   };
 
+  const deleteLetter = async (id) => {
+    if (!id) return;
+    await supabase.from("letters").delete().eq("id", id);
+    setLetters(prev => prev.filter(l => l.id !== id));
+  };
+
   const acceptConnection = async (senderId) => {
     if (!profile?.id) return;
     try {
@@ -1410,7 +1416,7 @@ export default function App() {
       {warnMsg&&<WarnModal msg={warnMsg} onClose={()=>setWarnMsg("")}/>}
       {promoRankInfo&&<PromotionCard profile={profile} rank={promoRankInfo.rank} hobon={promoRankInfo.hobon} onClose={()=>setPromoRankInfo(null)}/>}
       <div style={S.content}>
-        {tab==="home"&&<HomeDashboard profile={profile} friends={friends} myLeaves={leaves} mySchedules={schedules} perfDates={perfDates} notifs={notifs} letters={letters} onAccept={acceptConnection} onPoke={poke} onGoConnect={()=>handleTabChange("friends")} onViewPartnerCal={(id)=>{setViewingFriendId(id);setCalView("partner");setTab("cal");}} onSendLetter={sendLetter} onMarkLettersRead={markLettersRead}/>}
+        {tab==="home"&&<HomeDashboard profile={profile} friends={friends} myLeaves={leaves} mySchedules={schedules} perfDates={perfDates} notifs={notifs} letters={letters} onAccept={acceptConnection} onPoke={poke} onGoConnect={()=>handleTabChange("friends")} onViewPartnerCal={(id)=>{setViewingFriendId(id);setCalView("partner");setTab("cal");}} onSendLetter={sendLetter} onMarkLettersRead={markLettersRead} onDeleteLetter={deleteLetter}/>}
         {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} perfDates={calOutingDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} partner={partner} calView={calView} setCalView={setCalView} onAddNotif={addNotif} myName={profile.name}/>}
         {tab==="leave"&&!isGomshin&&<LeaveTab profile={profile} leaves={leaves} perfDates={perfDates} onAddLeave={addLeave} onDelLeave={delLeave}/>}
         {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setViewingFriendId(id);setCalView("partner");setTab("cal");}} onAddNotif={addNotif} onDisconnect={disconnectPartner} onPoke={poke} onAccept={acceptConnection}/>}
@@ -2061,7 +2067,7 @@ const DAILY_QUOTES = [
 ];
 
 // ===================== 홈 대시보드 (곰신·군화 공용 메인 화면) =====================
-function HomeDashboard({profile, friends, myLeaves, mySchedules, perfDates, notifs, letters, onAccept, onPoke, onGoConnect, onViewPartnerCal, onSendLetter, onMarkLettersRead}){
+function HomeDashboard({profile, friends, myLeaves, mySchedules, perfDates, notifs, letters, onAccept, onPoke, onGoConnect, onViewPartnerCal, onSendLetter, onMarkLettersRead, onDeleteLetter}){
   const today = toKey(new Date());
   const isGomshin = profile.userType === "gomshin";
   const pendingRequests = (notifs || []).filter(n => n.type === "connection_request" && n.senderId);
@@ -2121,11 +2127,12 @@ function HomeDashboard({profile, friends, myLeaves, mySchedules, perfDates, noti
   const [showLetters, setShowLetters] = useState(false);
   const [letterText, setLetterText] = useState("");
   const [letterTab, setLetterTab] = useState("received");
-  const receivedLetters = (letters || []).filter(l => l.direction !== "sent");
-  const sentLetters = (letters || []).filter(l => l.direction === "sent");
-  const unreadLetters = receivedLetters.filter(l => !l.read).length;
   const nameOf = (id) => (friends || []).find(f => f.id === id)?.name || "상대";
   const letterTarget = (sel && sel.kind === "friend") ? sel : (friends || [])[0] || null;
+  const receivedLetters = (letters || []).filter(l => l.direction !== "sent");
+  // 보낸 편지는 "지금 선택된 그 친구에게 보낸 것"만 표시
+  const sentLetters = (letters || []).filter(l => l.direction === "sent" && letterTarget && l.receiverId === letterTarget.id);
+  const unreadLetters = receivedLetters.filter(l => !l.read).length;
   const openLetters = () => { setShowLetters(true); if (unreadLetters > 0) onMarkLettersRead && onMarkLettersRead(); };
   const shownLetters = letterTab === "sent" ? sentLetters : receivedLetters;
   const sendLetter = async () => {
@@ -2296,15 +2303,16 @@ function HomeDashboard({profile, friends, myLeaves, mySchedules, perfDates, noti
             {shownLetters.length === 0 ? (
               <div style={{textAlign:"center", padding:"36px 0", color:"#B0B8C1"}}>
                 <div style={{fontSize:32, marginBottom:8}}>📭</div>
-                <div style={{fontSize:13, fontWeight:600}}>{letterTab === "sent" ? "아직 보낸 편지가 없어요" : "아직 받은 편지가 없어요"}</div>
+                <div style={{fontSize:13, fontWeight:600}}>{letterTab === "sent" ? (letterTarget ? `아직 ${letterTarget.name}님에게 보낸 편지가 없어요` : "아직 보낸 편지가 없어요") : "아직 받은 편지가 없어요"}</div>
               </div>
             ) : (
               <div style={{display:"flex", flexDirection:"column", gap:8, marginBottom:8}}>
                 {shownLetters.map(l => (
                   <div key={l.id} style={{background:"#F9FAFB", borderRadius:14, padding:"12px 14px", border:"1px solid #F0F2F5"}}>
-                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5}}>
-                      <span style={{fontSize:12.5, fontWeight:800, color:T.accent}}>{letterTab === "sent" ? `↗ ${nameOf(l.receiverId)}님에게` : `💌 ${nameOf(l.senderId)}님`}</span>
-                      <span style={{fontSize:10.5, color:"#B0B8C1"}}>{l.createdAt ? fmtDate(toKey(new Date(l.createdAt))) : ""}</span>
+                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:8, marginBottom:5}}>
+                      <span style={{fontSize:12.5, fontWeight:800, color:T.accent, flex:1, minWidth:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{letterTab === "sent" ? `↗ ${nameOf(l.receiverId)}님에게` : `💌 ${nameOf(l.senderId)}님`}</span>
+                      <span style={{fontSize:10.5, color:"#B0B8C1", flexShrink:0}}>{l.createdAt ? fmtDate(toKey(new Date(l.createdAt))) : ""}</span>
+                      {letterTab === "sent" && <button onClick={()=>{ if(window.confirm("이 편지를 삭제할까요?")) onDeleteLetter(l.id); }} style={{flexShrink:0, background:"none", border:"none", cursor:"pointer", fontSize:13, color:"#C0C8D4", padding:"2px 4px", lineHeight:1}} title="편지 삭제">✕</button>}
                     </div>
                     <div style={{fontSize:13.5, color:"#333", lineHeight:1.6, whiteSpace:"pre-wrap", wordBreak:"break-word"}}>{l.content}</div>
                   </div>
