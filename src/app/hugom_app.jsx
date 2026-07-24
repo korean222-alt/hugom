@@ -809,6 +809,7 @@ export default function App() {
             invite_code: data.partner_code,
             partner_id: data.partner_id || null,
             lastSeenRank: data.last_seen_rank || null,
+            avatar: data.avatar_emoji || null,
           });
           setAuthState("ready");
         } else {
@@ -898,6 +899,7 @@ export default function App() {
         return {
           id: pd.id,
           name: pd.name,
+          avatar: pd.avatar_emoji || null,
           userType: pd.role === "soldier" || pd.user_type === "soldier" ? "soldier" : "gomshin",
           enlist: pd.enlist_date,
           discharge: pd.discharge_date,
@@ -916,6 +918,18 @@ export default function App() {
     } catch (err) {
       console.error("loadFriendsData unexpected error:", err);
     }
+  };
+
+  // 알림 목록을 다시 불러오기 (Realtime이 순간적으로 놓쳐도 연결요청/제안이 반영되도록 보정)
+  const refreshNotifs = async () => {
+    if (!profile?.id) return;
+    const { data } = await supabase.from("notifications").select("*").eq("user_id", profile.id).order("created_at", { ascending: false });
+    if (!data) return;
+    setNotifs(data.map(n => {
+      let msg = n.message;
+      try { if (typeof msg === "string") msg = JSON.parse(msg); } catch(e) {}
+      return { id: n.id, type: msg?.type || "info", text: msg?.text || msg, dateRange: msg?.dateRange || null, time: "이전", read: n.is_read, senderId: msg?.senderId || null };
+    }));
   };
 
   // Realtime: 파트너가 보낸 알림 실시간 수신 (PHASE 4)
@@ -1017,7 +1031,7 @@ export default function App() {
     if (!profile?.id || profile.userType !== "gomshin") return;
     if (friends.length > 0) return;
     const iv = setInterval(() => {
-      if (document.visibilityState === "visible") loadFriendsData();
+      if (document.visibilityState === "visible") { loadFriendsData(); refreshNotifs(); }
     }, 25000);
     return () => clearInterval(iv);
   }, [profile?.id, profile?.userType, friends.length]);
@@ -1138,6 +1152,11 @@ export default function App() {
       if (error) { console.error("연결 수락 실패:", error); alert("연결 실패. 다시 시도해주세요."); return; }
 
       await loadFriendsData();
+      // 수락한 연결요청 알림은 DB에서도 제거 → 재조회/폴링 시 배너·벨에 다시 뜨는 것 방지
+      await supabase.from("notifications").delete()
+        .eq("user_id", profile.id)
+        .ilike("message", `%"type":"connection_request"%`)
+        .ilike("message", `%"senderId":"${senderId}"%`);
       alert("연결되었어요! 💝");
       setShowNotif(false);
       setNotifs(prev => prev.filter(n => !(n.type === "connection_request" && n.senderId === senderId)));
@@ -1352,7 +1371,7 @@ export default function App() {
       {warnMsg&&<WarnModal msg={warnMsg} onClose={()=>setWarnMsg("")}/>}
       {promoRankInfo&&<PromotionCard profile={profile} rank={promoRankInfo.rank} hobon={promoRankInfo.hobon} onClose={()=>setPromoRankInfo(null)}/>}
       <div style={S.content}>
-        {tab==="home"&&isGomshin&&<GomshinHome profile={profile} partner={connectedSoldier} onPoke={poke} onGoConnect={()=>handleTabChange("friends")} onViewPartnerCal={(id)=>{setViewingFriendId(id);setCalView("partner");setTab("cal");}}/>}
+        {tab==="home"&&isGomshin&&<GomshinHome profile={profile} partner={connectedSoldier} notifs={notifs} onAccept={acceptConnection} onPoke={poke} onGoConnect={()=>handleTabChange("friends")} onViewPartnerCal={(id)=>{setViewingFriendId(id);setCalView("partner");setTab("cal");}}/>}
         {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} perfDates={calOutingDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} partner={partner} calView={calView} setCalView={setCalView} onAddNotif={addNotif} myName={profile.name}/>}
         {tab==="leave"&&!isGomshin&&<LeaveTab profile={profile} leaves={leaves} perfDates={perfDates} onAddLeave={addLeave} onDelLeave={delLeave}/>}
         {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setViewingFriendId(id);setCalView("partner");setTab("cal");}} onAddNotif={addNotif} onDisconnect={disconnectPartner} onPoke={poke} onAccept={acceptConnection}/>}
@@ -1369,6 +1388,7 @@ export default function App() {
               missed_months: next.missedMonths,
               visit_out_cycle: next.visitOutCycle,
               last_seen_rank: next.lastSeenRank,
+              avatar_emoji: next.avatar || null,
             }).eq("id", next.id);
           }
         }} leaves={leaves} onReset={handleReset} setLeaves={setLeaves} setSchedules={setSchedules} setNotifs={setNotifs} setFriends={setFriends}/>}
@@ -1977,8 +1997,10 @@ function LeaveCard({leave,onDelete,past}){
 
 // ===================== 친구 탭 (데모 로직 삭제, 실제 DB 연동만 유지) =====================
 // ===================== 곰신 홈 대시보드 (곰신 메인 화면) =====================
-function GomshinHome({profile, partner, onPoke, onGoConnect, onViewPartnerCal}){
+function GomshinHome({profile, partner, notifs, onAccept, onPoke, onGoConnect, onViewPartnerCal}){
   const today = toKey(new Date());
+  // 받은 연결요청 (알림 벨에만 묻히지 않도록 홈 최상단에 크게 노출)
+  const pendingRequests = (notifs || []).filter(n => n.type === "connection_request" && n.senderId);
   const discharge = profile.discharge;
   const enlist = profile.enlist;
   const dLeft = discharge ? Math.max(0, diffDays(today, discharge)) : null;
@@ -2015,6 +2037,18 @@ function GomshinHome({profile, partner, onPoke, onGoConnect, onViewPartnerCal}){
   const wrap = {display:"flex", flexDirection:"column", gap:14, padding:16};
   return (
     <div className="su" style={wrap}>
+      {/* 받은 연결요청 배너 — 알림 벨에만 묻히지 않도록 홈 최상단에 노출 */}
+      {pendingRequests.length > 0 && pendingRequests.map(req => (
+        <div key={req.id} className="shake" style={{borderRadius:18, padding:"16px 18px", background:"linear-gradient(135deg,#FFE29A,#FFC93C)", border:"1px solid #F0B429", display:"flex", alignItems:"center", gap:12}}>
+          <div style={{fontSize:30}}>💌</div>
+          <div style={{flex:1, minWidth:0}}>
+            <div style={{fontSize:14, fontWeight:800, color:"#6B4E00"}}>새 연결 요청이 왔어요!</div>
+            <div style={{fontSize:12, color:"#8A6D1B", marginTop:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{req.text}</div>
+          </div>
+          <button onClick={()=>onAccept(req.senderId)} style={{flexShrink:0, padding:"9px 16px", borderRadius:12, border:"none", background:"#E91E8C", color:"#fff", fontSize:13, fontWeight:800, cursor:"pointer"}}>💝 수락</button>
+        </div>
+      ))}
+
       {/* 전역 D-day 히어로 */}
       {dLeft != null ? (
         <div style={{borderRadius:22, padding:"22px 20px", background:"linear-gradient(150deg,#7A1F4B 0%,#C2185B 45%,#E91E8C 100%)", color:"#fff", position:"relative", overflow:"hidden", boxShadow:"0 8px 24px rgba(194,24,91,.28)"}}>
@@ -2194,7 +2228,7 @@ function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal
               <div key={f.id} style={{display:"flex",flexDirection:"column",gap:0}}>
                 <div onClick={()=>setExpandedFriendId(expandedFriendId===f.id?null:f.id)} style={{...S.card,display:"flex",alignItems:"center",gap:12,cursor:"pointer",borderRadius:expandedFriendId===f.id?"16px 16px 0 0":"16px",transition:"all 0.2s",marginBottom:0}}>
                   <div style={{width:40,height:40,borderRadius:12,background:"#F2F4F6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
-                    {f.userType==="soldier"?"🪖":"💝"}
+                    {f.avatar || (f.userType==="soldier"?"🪖":"💝")}
                   </div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:14,fontWeight:700,color:"#191F28"}}>{f.name}</div>
@@ -2290,11 +2324,18 @@ function ProfileTab({profile,setProfile,leaves,onReset,setAuthState,setLeaves,se
   const [previewPromo,setPreviewPromo]=useState(false);
   const [editMissed,setEditMissed]=useState({...(profile.missedMonths||{이등병:0,일병:0,상병:0})});
   const saveRankEdit=()=>{setProfile(p=>({...p,missedMonths:editMissed}));setShowRankEdit(false);};
+  const [showAvatarPicker,setShowAvatarPicker]=useState(false);
+  const AVATAR_EMOJIS=["🪖","🎖️","✈️","🚁","⚓","🛡️","🎗️","🐻","🧸","💝","💗","❤️","🩷","🌸","🌷","🐶","🐱","🐰","🐣","🦄","⭐","🌟","🔥","🍀","👑","🎁","🌙","☀️","🫶","💌"];
+  const myAvatar=profile.avatar||(isGomshin?"💝":"✈️");
+  const chooseAvatar=(emoji)=>{setProfile(p=>({...p,avatar:emoji}));setShowAvatarPicker(false);};
   return(
     <div style={{padding:"16px 16px 32px",display:"flex",flexDirection:"column",gap:14}}>
       <div style={{background:isGomshin?"linear-gradient(135deg,#FF4081,#E91E8C)":"linear-gradient(135deg,#2D4A1E,#556B2F)",borderRadius:20,padding:20,boxShadow:isGomshin?"0 4px 16px rgba(233,30,140,.28)":"0 4px 16px rgba(61,90,30,.35)"}}>
         <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
-          <div style={{width:52,height:52,borderRadius:16,background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>{isGomshin?"💝":"✈️"}</div>
+          <div onClick={()=>setShowAvatarPicker(true)} title="프로필 아이콘 변경" style={{width:52,height:52,borderRadius:16,background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,cursor:"pointer",position:"relative",flexShrink:0}}>
+            {myAvatar}
+            <div style={{position:"absolute",bottom:-3,right:-3,width:19,height:19,borderRadius:"50%",background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,boxShadow:"0 1px 4px rgba(0,0,0,.25)"}}>✏️</div>
+          </div>
           <div><div style={{fontSize:20,fontWeight:800,color:"#fff"}}>{profile.name}</div><div style={{fontSize:12,color:"rgba(255,255,255,.65)",marginTop:2}}>{isGomshin?"기다리는 중 💝":rankInfo?`복무 중 · ${rankInfo.currentRank} ${rankInfo.hobon}호봉`:"복무 중"}</div></div>
         </div>
         <div style={{background:"rgba(255,255,255,.15)",borderRadius:12,padding:"12px 16px"}}>
@@ -2306,6 +2347,22 @@ function ProfileTab({profile,setProfile,leaves,onReset,setAuthState,setLeaves,se
           <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:10,color:"rgba(255,255,255,.6)"}}><span>복무 {pct}%</span><span>{served}일 / {total}일</span></div>
         </div>
       </div>
+
+      {showAvatarPicker&&(
+        <div className="fi" style={S.overlay} onClick={()=>setShowAvatarPicker(false)}>
+          <div className="su" style={S.sheet} onClick={e=>e.stopPropagation()}>
+            <div style={S.handle}/>
+            <div style={{fontSize:17,fontWeight:800,marginBottom:6}}>프로필 아이콘 선택</div>
+            <div style={{fontSize:12.5,color:"#8B95A1",marginBottom:16,lineHeight:1.5}}>고른 아이콘은 파트너의 친구 목록에도 똑같이 보여요.</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:8,marginBottom:16}}>
+              {AVATAR_EMOJIS.map(e=>(
+                <button key={e} onClick={()=>chooseAvatar(e)} style={{aspectRatio:"1",fontSize:24,borderRadius:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",background:myAvatar===e?(isGomshin?"#FFF0F8":"#EBF3FF"):"#F9FAFB",border:myAvatar===e?`2px solid ${isGomshin?"#E91E8C":"#3182F6"}`:"1.5px solid #F0F2F5"}}>{e}</button>
+              ))}
+            </div>
+            <button onClick={()=>chooseAvatar(null)} style={{...S.btn,background:"#F2F4F6",color:"#8B95A1",boxShadow:"none"}}>기본 아이콘으로 되돌리기</button>
+          </div>
+        </div>
+      )}
 
       {!isGomshin&&rankInfo&&(
         <div style={S.card}>
