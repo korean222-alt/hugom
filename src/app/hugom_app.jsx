@@ -745,6 +745,7 @@ export default function App() {
   const [schedules,setSchedules]=useState([]);
   const [notifs,setNotifs]=useState([]);
   const [friends,setFriends]=useState([]);
+  const [letters,setLetters]=useState([]);
   const [showNotif,setShowNotif]=useState(false);
   const [warnMsg,setWarnMsg]=useState("");
   const [promoRankInfo,setPromoRankInfo]=useState(null); // {rank, hobon} — 진급 축하 팝업 트리거
@@ -839,11 +840,13 @@ export default function App() {
   useEffect(()=>{
     if (!profile?.id) return;
     const loadData = async () => {
-      const [lv, sc, nt] = await Promise.all([
+      const [lv, sc, nt, lt] = await Promise.all([
         supabase.from("leaves").select("*").eq("user_id", profile.id).order("start_date"),
         supabase.from("schedules").select("*").eq("user_id", profile.id).order("date"),
         supabase.from("notifications").select("*").eq("user_id", profile.id).order("created_at", { ascending: false }),
+        supabase.from("letters").select("*").eq("receiver_id", profile.id).order("created_at", { ascending: false }),
       ]);
+      if (lt.data) setLetters(lt.data.map(l => ({ id: l.id, senderId: l.sender_id, content: l.content, read: l.is_read, createdAt: l.created_at })));
       if (lv.data) setLeaves(lv.data.map(l => ({
         id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo,
       })));
@@ -913,6 +916,8 @@ export default function App() {
           leaves: plv.data ? plv.data.map(l => ({ id: l.id, leave_type: l.type, start_date: l.start_date, end_date: l.end_date, memo: l.memo })) : [],
           schedules: psc.data ? psc.data.map(s => ({ id: s.id, event_type: s.type, event_date: s.date, memo: s.memo, title: s.title })) : [],
           pokeCount: myPokeCount + theirPokeCount,
+          // 친구가 마지막으로 일정을 등록/수정한 시각 (홈의 "○○님이 업데이트했어요" 판단용)
+          lastUpdate: [...(plv.data || []).map(l => l.created_at), ...(psc.data || []).map(s => s.created_at)].filter(Boolean).sort().slice(-1)[0] || null,
         };
       }));
 
@@ -1004,10 +1009,23 @@ export default function App() {
         }
       });
 
-    return () => { 
-      supabase.removeChannel(channel); 
+    // Realtime: 나에게 온 편지 실시간 수신
+    const lettersChannel = supabase
+      .channel("letters-" + profile.id)
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "letters",
+        filter: `receiver_id=eq.${profile.id}`,
+      }, (payload) => {
+        const l = payload.new;
+        setLetters(prev => prev.some(x => x.id === l.id) ? prev : [{ id: l.id, senderId: l.sender_id, content: l.content, read: l.is_read, createdAt: l.created_at }, ...prev]);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
       supabase.removeChannel(pokeChannel);
       supabase.removeChannel(connectionsChannel);
+      supabase.removeChannel(lettersChannel);
     };
   }, [profile?.id]);
 
@@ -1147,6 +1165,23 @@ export default function App() {
     return { success: true };
   };
 
+  // 편지 보내기 (연결된 친구에게) — 군사보안 금칙어 필터 재사용
+  const sendLetter = async (receiverId, content) => {
+    if (!profile?.id || !receiverId || !content?.trim()) return { success: false };
+    const forbidden = checkForbidden(content);
+    if (forbidden) return { success: false, reason: `보안 위험 단어("${forbidden}")가 포함되어 있어요. 수정 후 다시 보내주세요.` };
+    const { error } = await supabase.from("letters").insert({ sender_id: profile.id, receiver_id: receiverId, content: content.trim() });
+    if (error) { console.error("편지 전송 실패:", error); return { success: false, reason: "편지 전송에 실패했어요. 잠시 후 다시 시도해주세요." }; }
+    addNotif({ type: "letter", text: `${profile.name}님이 편지를 보냈어요 💌`, recipientId: receiverId });
+    return { success: true };
+  };
+
+  const markLettersRead = async () => {
+    if (!profile?.id) return;
+    setLetters(prev => prev.map(l => ({ ...l, read: true })));
+    await supabase.from("letters").update({ is_read: true }).eq("receiver_id", profile.id).eq("is_read", false);
+  };
+
   const acceptConnection = async (senderId) => {
     if (!profile?.id) return;
     try {
@@ -1272,6 +1307,7 @@ export default function App() {
           supabase.from("leaves").delete().eq("user_id", profile.id),
           supabase.from("schedules").delete().eq("user_id", profile.id),
           supabase.from("notifications").delete().eq("user_id", profile.id),
+          supabase.from("letters").delete().or(`sender_id.eq.${profile.id},receiver_id.eq.${profile.id}`),
         ]);
 
         const { error: delError } = await supabase.from("users").delete().eq("id", profile.id);
@@ -1292,6 +1328,7 @@ export default function App() {
     setSchedules([]);
     setNotifs([]);
     setFriends([]);
+    setLetters([]);
     setAuthState("no_user");
   };
 
@@ -1339,8 +1376,6 @@ export default function App() {
   // 로그인 + 프로필 있음 → 메인 앱
   const isGomshin=profile.userType==="gomshin";
   const partner=friends.find(f=>f.id===viewingFriendId)||null;
-  // 홈에서 쓸 "대표 연결 상대" — 나와 반대 유형(곰신↔군화)을 우선, 없으면 첫 친구
-  const homePartner=friends.find(f=>f.userType!==profile.userType)||friends[0]||null;
   // calView: "mine" | "partner" — 곰신/군화 공통으로 토글 가능 (상단 state 선언 참조)
   const showingPartner=calView==="partner"&&!!partner;
   const calLeaves=showingPartner?(partner.leaves||[]):leaves;
@@ -1373,7 +1408,7 @@ export default function App() {
       {warnMsg&&<WarnModal msg={warnMsg} onClose={()=>setWarnMsg("")}/>}
       {promoRankInfo&&<PromotionCard profile={profile} rank={promoRankInfo.rank} hobon={promoRankInfo.hobon} onClose={()=>setPromoRankInfo(null)}/>}
       <div style={S.content}>
-        {tab==="home"&&<HomeDashboard profile={profile} partner={homePartner} myLeaves={leaves} mySchedules={schedules} perfDates={perfDates} notifs={notifs} onAccept={acceptConnection} onPoke={poke} onGoConnect={()=>handleTabChange("friends")} onViewPartnerCal={(id)=>{setViewingFriendId(id);setCalView("partner");setTab("cal");}}/>}
+        {tab==="home"&&<HomeDashboard profile={profile} friends={friends} myLeaves={leaves} mySchedules={schedules} perfDates={perfDates} notifs={notifs} letters={letters} onAccept={acceptConnection} onPoke={poke} onGoConnect={()=>handleTabChange("friends")} onViewPartnerCal={(id)=>{setViewingFriendId(id);setCalView("partner");setTab("cal");}} onSendLetter={sendLetter} onMarkLettersRead={markLettersRead}/>}
         {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} perfDates={calOutingDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} partner={partner} calView={calView} setCalView={setCalView} onAddNotif={addNotif} myName={profile.name}/>}
         {tab==="leave"&&!isGomshin&&<LeaveTab profile={profile} leaves={leaves} perfDates={perfDates} onAddLeave={addLeave} onDelLeave={delLeave}/>}
         {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setViewingFriendId(id);setCalView("partner");setTab("cal");}} onAddNotif={addNotif} onDisconnect={disconnectPartner} onPoke={poke} onAccept={acceptConnection}/>}
@@ -1997,65 +2032,109 @@ function LeaveCard({leave,onDelete,past}){
   return(<div style={{background:past?"#F9FAFB":lt.bg,borderRadius:16,padding:"14px 16px",border:`1px solid ${past?"#E8ECF0":lt.border}`,marginBottom:8,display:"flex",alignItems:"center",gap:12}}><div style={{width:42,height:42,borderRadius:12,background:past?"#E8ECF0":lt.color+"22",border:`1.5px solid ${past?"#D1D6DB":lt.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{lt.icon}</div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:past?"#8B95A1":lt.color}}>{lt.label}</div><div style={{fontSize:12,color:"#4E5968",marginTop:2}}>{leave.start_date} ~ {leave.end_date}</div><div style={{fontSize:11,color:"#B0B8C1"}}>{days}일{leave.memo?" · "+leave.memo:""}</div></div><button onClick={onDelete} style={{padding:"6px 10px",background:"rgba(240,68,82,.08)",border:"none",borderRadius:8,fontSize:12,color:"#F04452",fontWeight:700,cursor:"pointer"}}>삭제</button></div>);
 }
 
+// 오늘의 명언 — 매일 번갈아 표시 (군인·연인 상황과 느슨하게 연관되는 인내·시간·사랑·용기 명언)
+const DAILY_QUOTES = [
+  {t:"인내는 쓰지만 그 열매는 달다.", a:"장 자크 루소"},
+  {t:"가장 어두운 밤도 언젠가는 끝나고 해는 떠오른다.", a:"빅토르 위고"},
+  {t:"천 리 길도 한 걸음부터.", a:"노자"},
+  {t:"느리더라도 멈추지만 않으면 된다.", a:"공자"},
+  {t:"용기란 두려움이 없는 게 아니라, 두려움을 이겨내는 것이다.", a:"넬슨 만델라"},
+  {t:"포기하지 마라. 고통은 잠깐이지만 포기는 영원히 남는다.", a:"랜스 암스트롱"},
+  {t:"성공은 매일 반복한 작은 노력들의 합이다.", a:"로버트 콜리어"},
+  {t:"별은 어둠이 짙을수록 더 밝게 빛난다.", a:""},
+  {t:"이 또한 지나가리라.", a:""},
+  {t:"산을 옮기는 사람은 작은 돌을 나르는 것부터 시작한다.", a:"공자"},
+  {t:"기다림은 사랑이 지나가는 가장 긴 길이다.", a:""},
+  {t:"떨어져 있어도 마음의 거리는 멀어지지 않는다.", a:""},
+  {t:"강물은 굽이쳐 흘러도 결국 바다에 이른다.", a:""},
+  {t:"끝까지 버티는 사람이 결국 이긴다.", a:""},
+  {t:"오늘 걷지 않으면 내일은 뛰어야 한다.", a:""},
+  {t:"고난의 시기에 뿌린 씨앗이 훗날 가장 단 열매가 된다.", a:""},
+  {t:"사랑은 서로를 바라보는 것이 아니라 같은 곳을 바라보는 것이다.", a:"생텍쥐페리"},
+  {t:"지금의 고생은 언젠가 웃으며 나눌 이야기가 된다.", a:""},
+  {t:"가장 긴 하루도 24시간이면 끝난다.", a:""},
+  {t:"할 수 있다고 믿는 사람은 결국 해낸다.", a:""},
+  {t:"시간은 언제나 성실한 사람의 편이다.", a:""},
+  {t:"그리움은 사랑이 살아있다는 증거다.", a:""},
+];
+
 // ===================== 홈 대시보드 (곰신·군화 공용 메인 화면) =====================
-function HomeDashboard({profile, partner, myLeaves, mySchedules, perfDates, notifs, onAccept, onPoke, onGoConnect, onViewPartnerCal}){
+function HomeDashboard({profile, friends, myLeaves, mySchedules, perfDates, notifs, letters, onAccept, onPoke, onGoConnect, onViewPartnerCal, onSendLetter, onMarkLettersRead}){
   const today = toKey(new Date());
   const isGomshin = profile.userType === "gomshin";
-  // 받은 연결요청 (알림 벨에만 묻히지 않도록 홈 최상단에 크게 노출)
   const pendingRequests = (notifs || []).filter(n => n.type === "connection_request" && n.senderId);
-  const discharge = profile.discharge;
-  const enlist = profile.enlist;
-  const dLeft = discharge ? Math.max(0, diffDays(today, discharge)) : null;
-  const total = (enlist && discharge) ? diffDays(enlist, discharge) : null;
-  const served = (enlist && total) ? Math.min(total, Math.max(0, diffDays(enlist, today))) : null;
-  const pct = (total && served != null && total > 0) ? Math.min(100, Math.round(served / total * 100)) : null;
 
-  // 테마: 곰신은 로즈, 군화는 밀리터리 그린 (하트 이모지 최소화)
   const T = isGomshin
-    ? {accent:"#C2185B", heroGrad:"linear-gradient(150deg,#8E2C57 0%,#C2185B 100%)", heroShadow:"0 8px 24px rgba(194,24,91,.26)", softBg:"#FDF4F8", softBorder:"#F3D9E5", chipBg:"#FBEAF1", ctaGrad:"linear-gradient(135deg,#D75A8C,#C2185B)", heroEmoji:"🐻"}
-    : {accent:"#4C6C29", heroGrad:"linear-gradient(150deg,#2D4A1E 0%,#4E6B2A 100%)", heroShadow:"0 8px 24px rgba(61,90,30,.30)", softBg:"#F3F7EC", softBorder:"#DDE8CC", chipBg:"#EAF0DE", ctaGrad:"linear-gradient(135deg,#6B8E3D,#3D5A1E)", heroEmoji:"🎖️"};
+    ? {accent:"#C2185B", heroGrad:"linear-gradient(150deg,#8E2C57 0%,#C2185B 100%)", heroShadow:"0 8px 24px rgba(194,24,91,.26)", softBg:"#FDF4F8", softBorder:"#F3D9E5", chipBg:"#FBEAF1", heroEmoji:"🐻"}
+    : {accent:"#4C6C29", heroGrad:"linear-gradient(150deg,#2D4A1E 0%,#4E6B2A 100%)", heroShadow:"0 8px 24px rgba(61,90,30,.30)", softBg:"#F3F7EC", softBorder:"#DDE8CC", chipBg:"#EAF0DE", heroEmoji:"🎖️"};
 
   const leaveLabel = (t) => ({annual:"🌿 연가", reward:"🏅 포상휴가", perf:"⭐ 외박", consol:"💙 위로휴가", medical:"🏥 청원휴가"}[t] || "🌿 휴가");
   const schedLabel = (t) => ({visit_in:"🏠 영내면회", "영내면회":"🏠 영내면회", visit_out:"🚗 면회외출", "면회외출":"🚗 면회외출"}[t] || "📌 일정");
+  const friendEmoji = (f) => f.avatar || (f.userType === "soldier" ? "🪖" : "💝");
 
-  // 다음 일정 = 곰신이면 파트너(군화)의, 군화면 본인의 다가오는 휴가/외박/면회 중 가장 가까운 것
+  // 홈에서 보여줄 "대상 목록" — 군화는 본인(나) + 친구들, 곰신은 친구들(없으면 온보딩 군화 정보)
+  const focusList = useMemo(() => {
+    const list = [];
+    if (!isGomshin) list.push({id:"me", kind:"me", name:"나", discharge:profile.discharge, enlist:profile.enlist, avatar:profile.avatar || "🎖️"});
+    (friends || []).forEach(f => list.push({id:f.id, kind:"friend", name:f.name, discharge:f.discharge, enlist:f.enlist, avatar:friendEmoji(f), userType:f.userType, leaves:f.leaves, schedules:f.schedules, pokeCount:f.pokeCount, lastUpdate:f.lastUpdate}));
+    if (isGomshin && (friends || []).length === 0 && profile.discharge) list.push({id:"mygun", kind:"placeholder", name:"내 군화", discharge:profile.discharge, enlist:profile.enlist, avatar:"🐻"});
+    return list;
+  }, [isGomshin, friends, profile]);
+
+  const [selId, setSelId] = useState(null);
+  const sel = focusList.find(x => x.id === selId) || focusList[0] || null;
+
+  // 친구가 일정을 업데이트했는지(마지막 확인 시점 이후) — localStorage로 가볍게 추적
+  const [seen, setSeen] = useState({});
+  useEffect(() => { try { setSeen(JSON.parse(localStorage.getItem("hugom_seen_updates") || "{}")); } catch(e) {} }, []);
+  const hasUpdate = (f) => f && f.kind === "friend" && f.lastUpdate && (!seen[f.id] || f.lastUpdate > seen[f.id]);
+  const ackUpdate = (id, ts) => { if (!id || !ts) return; setSeen(prev => { const n = {...prev, [id]: ts}; try { localStorage.setItem("hugom_seen_updates", JSON.stringify(n)); } catch(e) {} return n; }); };
+  const goCal = (f) => { if (f?.lastUpdate) ackUpdate(f.id, f.lastUpdate); onViewPartnerCal(f.id); };
+
+  // 히어로(전역 D-day) — 선택된 대상 기준
+  const hDis = sel?.discharge, hEn = sel?.enlist;
+  const hLeft = hDis ? Math.max(0, diffDays(today, hDis)) : null;
+  const hTot = (hEn && hDis) ? diffDays(hEn, hDis) : null;
+  const hSer = (hEn && hTot) ? Math.min(hTot, Math.max(0, diffDays(hEn, today))) : null;
+  const hPct = (hTot && hSer != null && hTot > 0) ? Math.min(100, Math.round(hSer / hTot * 100)) : null;
+  const heroLabel = !sel ? "" : sel.kind === "me" ? "전역까지" : `${sel.name}님 전역까지`;
+
+  // 다음 일정 — 선택 대상 기준
   const nextItem = useMemo(() => {
+    if (!sel) return null;
+    const lv = sel.kind === "me" ? (myLeaves || []) : (sel.leaves || []);
+    const sc = sel.kind === "me" ? (mySchedules || []) : (sel.schedules || []);
     const items = [];
-    const lv = isGomshin ? (partner?.leaves || []) : (myLeaves || []);
-    const sc = isGomshin ? (partner?.schedules || []) : (mySchedules || []);
     lv.forEach(l => { if (l.start_date && l.start_date >= today) items.push({date:l.start_date, end:l.end_date, label:leaveLabel(l.leave_type)}); });
     sc.forEach(s => { if (s.event_date && s.event_date >= today) items.push({date:s.event_date, end:null, label:s.title || schedLabel(s.event_type)}); });
-    if (!isGomshin) (perfDates || []).forEach(p => { if (p.start >= today) items.push({date:p.start, end:p.end, label:"⭐ 외박"}); });
+    if (sel.kind === "me") (perfDates || []).forEach(p => { if (p.start >= today) items.push({date:p.start, end:p.end, label:"⭐ 외박"}); });
     items.sort((a,b) => a.date < b.date ? -1 : 1);
     return items[0] || null;
-  }, [isGomshin, partner, myLeaves, mySchedules, perfDates, today]);
-
-  const affirmations = isGomshin ? [
-    "오늘도 하루가 줄었어요. 잘 기다리고 있어요",
-    "함께할 시간이 기다림보다 길 거예요",
-    "오늘 군화도 분명 생각하고 있을 거예요",
-    "조금씩, 그리고 분명히 가까워지고 있어요",
-    "기다림도 그 사람을 아끼는 마음이에요",
-    "오늘 하루도 씩씩하게 보내요",
-    "다음 만남이 어제보다 가까워졌어요",
-  ] : [
-    "전역이 하루 더 가까워졌다",
-    "오늘도 무사히, 잘 버티고 있다",
-    "시간은 확실히 네 편이다",
-    "여기까지 온 만큼, 남은 것도 줄었다",
-    "오늘 하루도 고생 많았어요",
-    "페이스 유지하자. 곧이다",
-  ];
-  const todayLine = affirmations[Math.floor(Date.now() / 86400000) % affirmations.length];
-  const soldierName = partner?.name || "군화";
-  const heroLabel = isGomshin ? `${soldierName}님 전역까지` : "전역까지";
+  }, [sel, myLeaves, mySchedules, perfDates, today]);
   const nextLabel = isGomshin ? "다음 만남까지" : "다음 휴가·외박까지";
 
+  const quote = DAILY_QUOTES[Math.floor(Date.now() / 86400000) % DAILY_QUOTES.length];
+
+  // 편지함
+  const [showLetters, setShowLetters] = useState(false);
+  const [letterText, setLetterText] = useState("");
+  const unreadLetters = (letters || []).filter(l => !l.read).length;
+  const nameOf = (senderId) => (friends || []).find(f => f.id === senderId)?.name || "상대";
+  const letterTarget = (sel && sel.kind === "friend") ? sel : (friends || [])[0] || null;
+  const openLetters = () => { setShowLetters(true); if (unreadLetters > 0) onMarkLettersRead && onMarkLettersRead(); };
+  const sendLetter = async () => {
+    if (!letterTarget || !letterText.trim()) return;
+    const res = await onSendLetter(letterTarget.id, letterText.trim());
+    if (res?.success) setLetterText("");
+    else if (res?.reason) alert(res.reason);
+  };
+
+  const selIsFriend = sel && sel.kind === "friend";
   const wrap = {display:"flex", flexDirection:"column", gap:14, padding:16};
   return (
     <div className="su" style={wrap}>
       {/* 받은 연결요청 배너 */}
-      {pendingRequests.length > 0 && pendingRequests.map(req => (
+      {pendingRequests.map(req => (
         <div key={req.id} className="shake" style={{borderRadius:18, padding:"16px 18px", background:"linear-gradient(135deg,#FFE7A8,#FFCE54)", border:"1px solid #F0B429", display:"flex", alignItems:"center", gap:12}}>
           <div style={{fontSize:28}}>📨</div>
           <div style={{flex:1, minWidth:0}}>
@@ -2066,25 +2145,40 @@ function HomeDashboard({profile, partner, myLeaves, mySchedules, perfDates, noti
         </div>
       ))}
 
+      {/* 대상 전환 스위처 (2명 이상일 때) */}
+      {focusList.length > 1 && (
+        <div style={{display:"flex", gap:8, overflowX:"auto", paddingBottom:2}}>
+          {focusList.map(f => {
+            const on = sel && sel.id === f.id;
+            return (
+              <button key={f.id} onClick={()=>setSelId(f.id)} style={{flexShrink:0, position:"relative", display:"flex", alignItems:"center", gap:7, padding:"8px 14px", borderRadius:100, cursor:"pointer", border:on?`1.5px solid ${T.accent}`:"1.5px solid #E8ECF0", background:on?T.softBg:"#fff", color:on?T.accent:"#4E5968", fontSize:13, fontWeight:700}}>
+                <span style={{fontSize:16}}>{f.avatar}</span>{f.name}
+                {hasUpdate(f) && <span style={{position:"absolute", top:4, right:6, width:8, height:8, borderRadius:"50%", background:"#F04452", border:"1.5px solid #fff"}}/>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* 전역 D-day 히어로 */}
-      {dLeft != null ? (
+      {hLeft != null ? (
         <div style={{borderRadius:22, padding:"22px 20px", background:T.heroGrad, color:"#fff", position:"relative", overflow:"hidden", boxShadow:T.heroShadow}}>
         <div style={{position:"absolute", top:-40, right:-30, width:150, height:150, borderRadius:"50%", background:"rgba(255,255,255,.08)"}}/>
         <div style={{position:"relative"}}>
           <div style={{fontSize:12, fontWeight:700, color:"rgba(255,255,255,.85)"}}>{heroLabel}</div>
           <div style={{display:"flex", alignItems:"flex-end", gap:8, marginTop:4}}>
-            <div style={{fontSize:52, fontWeight:900, lineHeight:1}}>D-{dLeft}</div>
-            <div style={{fontSize:26, marginBottom:4}}>{T.heroEmoji}</div>
+            <div style={{fontSize:52, fontWeight:900, lineHeight:1}}>D-{hLeft}</div>
+            <div style={{fontSize:26, marginBottom:4}}>{sel?.avatar || T.heroEmoji}</div>
           </div>
-          <div style={{fontSize:12, color:"rgba(255,255,255,.8)", marginTop:6}}>{fmtDate(discharge)} 전역 예정</div>
-          {pct != null && (
+          <div style={{fontSize:12, color:"rgba(255,255,255,.8)", marginTop:6}}>{fmtDate(hDis)} 전역 예정</div>
+          {hPct != null && (
             <div style={{marginTop:16}}>
               <div style={{height:8, borderRadius:100, background:"rgba(255,255,255,.22)", overflow:"hidden"}}>
-                <div style={{height:"100%", width:`${pct}%`, borderRadius:100, background:"#fff"}}/>
+                <div style={{height:"100%", width:`${hPct}%`, borderRadius:100, background:"#fff"}}/>
               </div>
               <div style={{display:"flex", justifyContent:"space-between", marginTop:6, fontSize:11, color:"rgba(255,255,255,.85)", fontWeight:600}}>
-                <span>복무 {pct}% 지남</span>
-                <span>{served}일 / {total}일</span>
+                <span>복무 {hPct}% 지남</span>
+                <span>{hSer}일 / {hTot}일</span>
               </div>
             </div>
           )}
@@ -2098,52 +2192,116 @@ function HomeDashboard({profile, partner, myLeaves, mySchedules, perfDates, noti
         </div>
       )}
 
-      {/* 오늘의 한 줄 */}
-      <div style={{...S.card, display:"flex", alignItems:"center", gap:12, background:T.softBg, boxShadow:"none", border:`1px solid ${T.softBorder}`}}>
-        <div style={{fontSize:22}}>☀️</div>
-        <div style={{fontSize:13.5, fontWeight:700, color:T.accent, lineHeight:1.5}}>{todayLine}</div>
+      {/* 오늘의 명언 */}
+      <div style={{...S.card, background:T.softBg, boxShadow:"none", border:`1px solid ${T.softBorder}`}}>
+        <div style={{fontSize:10.5, fontWeight:800, letterSpacing:"0.08em", color:T.accent, marginBottom:6}}>📜 오늘의 명언</div>
+        <div style={{fontSize:14, fontWeight:700, color:"#2A2A2A", lineHeight:1.6}}>“{quote.t}”</div>
+        {quote.a && <div style={{fontSize:11.5, color:"#8B95A1", marginTop:6, textAlign:"right", fontWeight:600}}>— {quote.a}</div>}
       </div>
+
+      {/* 친구 일정 업데이트 알림 */}
+      {selIsFriend && hasUpdate(sel) && (
+        <div onClick={()=>goCal(sel)} style={{borderRadius:14, padding:"12px 16px", background:"#FFF6E5", border:"1px solid #FFDFA0", display:"flex", alignItems:"center", gap:10, cursor:"pointer"}}>
+          <span style={{fontSize:20}}>🔔</span>
+          <div style={{flex:1, fontSize:13, fontWeight:700, color:"#8A5A00"}}>{sel.name}님이 일정을 업데이트했어요! <span style={{color:"#B0894A", fontWeight:600}}>달력에서 확인</span></div>
+          <span style={{fontSize:16, color:"#D9B26A"}}>›</span>
+        </div>
+      )}
 
       {/* 다음 일정 */}
       {nextItem && (
-        <div onClick={(isGomshin && partner) ? ()=>onViewPartnerCal(partner.id) : undefined} style={{...S.card, cursor:(isGomshin && partner) ? "pointer" : "default", display:"flex", alignItems:"center", gap:14}}>
+        <div onClick={selIsFriend ? ()=>goCal(sel) : undefined} style={{...S.card, cursor:selIsFriend ? "pointer" : "default", display:"flex", alignItems:"center", gap:14}}>
           <div style={{width:52, height:52, borderRadius:16, background:T.chipBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:26, flexShrink:0}}>📅</div>
           <div style={{flex:1, minWidth:0}}>
             <div style={{fontSize:11, fontWeight:700, color:T.accent}}>{nextLabel}</div>
             <div style={{fontSize:20, fontWeight:900, color:"#191F28", lineHeight:1.2}}>D-{Math.max(0, diffDays(today, nextItem.date))}</div>
             <div style={{fontSize:12, color:"#8B95A1", marginTop:2}}>{nextItem.label} · {fmtDate(nextItem.date)}{nextItem.end && nextItem.end !== nextItem.date ? ` ~ ${fmtDate(nextItem.end)}` : ""}</div>
           </div>
-          {(isGomshin && partner) && <div style={{fontSize:18, color:"#D0D8E0"}}>›</div>}
-        </div>
-      )}
-      {/* 곰신인데 연결됐지만 예정 일정이 없을 때 → 제안 유도 */}
-      {isGomshin && partner && !nextItem && (
-        <div style={{...S.card, textAlign:"center", padding:"22px 18px"}}>
-          <div style={{fontSize:26, marginBottom:6}}>🗓️</div>
-          <div style={{fontSize:14, fontWeight:700, color:"#191F28"}}>아직 예정된 휴가·면회가 없어요</div>
-          <div style={{fontSize:12, color:"#8B95A1", marginTop:5, marginBottom:14}}>군화에게 원하는 날짜로 제안해볼까요?</div>
-          <button onClick={onGoConnect} style={{...S.btn, background:T.accent, color:"#fff", boxShadow:"none"}}>휴가·면회 제안하기</button>
+          {selIsFriend && <div style={{fontSize:18, color:"#D0D8E0"}}>›</div>}
         </div>
       )}
 
-      {/* 연결 상태별 */}
-      {partner ? (
+      {/* 선택 대상이 친구면 콕찌르기·달력 */}
+      {selIsFriend && (
         <div style={{display:"flex", gap:10}}>
-          <button onClick={()=>onPoke(partner.id)} style={{flex:1, padding:"14px 10px", borderRadius:16, border:"none", cursor:"pointer", background:"linear-gradient(135deg,#FF9500,#FF6B00)", color:"#fff", fontSize:13.5, fontWeight:800, display:"flex", flexDirection:"column", alignItems:"center", gap:3}}>
+          <button onClick={()=>onPoke(sel.id)} style={{flex:1, padding:"14px 10px", borderRadius:16, border:"none", cursor:"pointer", background:"linear-gradient(135deg,#FF9500,#FF6B00)", color:"#fff", fontSize:13.5, fontWeight:800, display:"flex", flexDirection:"column", alignItems:"center", gap:3}}>
             <span style={{fontSize:20}}>👉</span>
-            콕 찌르기{partner.pokeCount > 0 ? ` ${partner.pokeCount}` : ""}
+            콕 찌르기{sel.pokeCount > 0 ? ` ${sel.pokeCount}` : ""}
           </button>
-          <button onClick={()=>onViewPartnerCal(partner.id)} style={{flex:1, padding:"14px 10px", borderRadius:16, border:"none", cursor:"pointer", background:"#F2F4F6", color:"#4E5968", fontSize:13.5, fontWeight:800, display:"flex", flexDirection:"column", alignItems:"center", gap:3}}>
+          <button onClick={()=>goCal(sel)} style={{flex:1, padding:"14px 10px", borderRadius:16, border:"none", cursor:"pointer", background:"#F2F4F6", color:"#4E5968", fontSize:13.5, fontWeight:800, display:"flex", flexDirection:"column", alignItems:"center", gap:3}}>
             <span style={{fontSize:20}}>📅</span>
-            {partner.name}님 달력
+            {sel.name}님 달력
           </button>
         </div>
-      ) : (
-        <div style={{borderRadius:20, padding:"24px 20px", background:T.ctaGrad, color:"#fff", textAlign:"center", boxShadow:T.heroShadow}}>
+      )}
+
+      {/* 편지함 */}
+      <div onClick={openLetters} style={{...S.card, cursor:"pointer", display:"flex", alignItems:"center", gap:14}}>
+        <div style={{position:"relative", width:52, height:52, borderRadius:16, background:T.chipBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:26, flexShrink:0}}>
+          💌
+          {unreadLetters > 0 && <div style={{position:"absolute", top:-4, right:-4, minWidth:20, height:20, padding:"0 5px", borderRadius:10, background:"#F04452", color:"#fff", fontSize:11, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center", border:"2px solid #fff"}}>{unreadLetters}</div>}
+        </div>
+        <div style={{flex:1, minWidth:0}}>
+          <div style={{fontSize:14, fontWeight:800, color:"#191F28"}}>편지함</div>
+          <div style={{fontSize:12, color:"#8B95A1", marginTop:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
+            {(letters || []).length === 0 ? "친구에게 마음을 담은 편지를 남겨보세요" : unreadLetters > 0 ? `읽지 않은 편지 ${unreadLetters}통` : `${nameOf(letters[0].senderId)}님: ${letters[0].content}`}
+          </div>
+        </div>
+        <span style={{fontSize:18, color:"#D0D8E0"}}>›</span>
+      </div>
+
+      {/* 미연결 시 연결 유도 */}
+      {(friends || []).length === 0 && (
+        <div style={{borderRadius:20, padding:"24px 20px", background:T.heroGrad, color:"#fff", textAlign:"center", boxShadow:T.heroShadow}}>
           <div style={{fontSize:30, marginBottom:8}}>{isGomshin ? "🔗" : "🤝"}</div>
           <div style={{fontSize:16, fontWeight:800}}>{isGomshin ? "군화와 연결해보세요" : "곰신·전우와 연결해보세요"}</div>
-          <div style={{fontSize:12.5, color:"rgba(255,255,255,.9)", marginTop:6, lineHeight:1.6}}>연결하면 서로의 휴가·외박·면회 일정을<br/>함께 보고, 콕 찌르기로 안부도 전할 수 있어요.</div>
+          <div style={{fontSize:12.5, color:"rgba(255,255,255,.9)", marginTop:6, lineHeight:1.6}}>연결하면 서로의 휴가·외박·면회 일정을<br/>함께 보고, 편지·콕 찌르기로 안부도 전할 수 있어요.</div>
           <button onClick={onGoConnect} style={{...S.btn, background:"#fff", color:T.accent, marginTop:16, boxShadow:"none"}}>연결하러 가기</button>
+        </div>
+      )}
+
+      {/* 편지함 모달 */}
+      {showLetters && (
+        <div className="fi" style={S.overlay} onClick={()=>setShowLetters(false)}>
+          <div className="su" style={S.sheet} onClick={e=>e.stopPropagation()}>
+            <div style={S.handle}/>
+            <div style={{fontSize:17, fontWeight:800, marginBottom:14}}>💌 편지함</div>
+
+            {/* 편지 쓰기 */}
+            {letterTarget ? (
+              <div style={{background:T.softBg, border:`1px solid ${T.softBorder}`, borderRadius:16, padding:14, marginBottom:16}}>
+                <div style={{fontSize:12, fontWeight:700, color:T.accent, marginBottom:8}}>{letterTarget.name}님에게 편지 쓰기</div>
+                <textarea value={letterText} onChange={e=>setLetterText(e.target.value.slice(0,500))} placeholder="따뜻한 한마디를 남겨보세요 (최대 500자)" style={{width:"100%", minHeight:72, resize:"none", border:"1.5px solid #E8ECF0", borderRadius:12, padding:"10px 12px", fontSize:14, fontFamily:"inherit", outline:"none", boxSizing:"border-box"}}/>
+                <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:8}}>
+                  <span style={{fontSize:11, color:"#B0B8C1"}}>{letterText.length}/500</span>
+                  <button onClick={sendLetter} disabled={!letterText.trim()} style={{padding:"8px 18px", borderRadius:10, border:"none", background:letterText.trim()?T.accent:"#E8ECF0", color:letterText.trim()?"#fff":"#B0B8C1", fontSize:13, fontWeight:800, cursor:letterText.trim()?"pointer":"default"}}>보내기</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{background:"#F9FAFB", borderRadius:12, padding:"12px 14px", marginBottom:16, fontSize:12.5, color:"#8B95A1", lineHeight:1.6}}>연결된 친구가 있어야 편지를 보낼 수 있어요. 먼저 연결해보세요.</div>
+            )}
+
+            {/* 받은 편지 목록 */}
+            <div style={{fontSize:12, fontWeight:700, color:"#8B95A1", marginBottom:8}}>받은 편지 {(letters || []).length > 0 ? `(${letters.length})` : ""}</div>
+            {(letters || []).length === 0 ? (
+              <div style={{textAlign:"center", padding:"36px 0", color:"#B0B8C1"}}>
+                <div style={{fontSize:32, marginBottom:8}}>📭</div>
+                <div style={{fontSize:13, fontWeight:600}}>아직 받은 편지가 없어요</div>
+              </div>
+            ) : (
+              <div style={{display:"flex", flexDirection:"column", gap:8, marginBottom:8}}>
+                {letters.map(l => (
+                  <div key={l.id} style={{background:"#F9FAFB", borderRadius:14, padding:"12px 14px", border:"1px solid #F0F2F5"}}>
+                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5}}>
+                      <span style={{fontSize:12.5, fontWeight:800, color:T.accent}}>💌 {nameOf(l.senderId)}님</span>
+                      <span style={{fontSize:10.5, color:"#B0B8C1"}}>{l.createdAt ? fmtDate(toKey(new Date(l.createdAt))) : ""}</span>
+                    </div>
+                    <div style={{fontSize:13.5, color:"#333", lineHeight:1.6, whiteSpace:"pre-wrap", wordBreak:"break-word"}}>{l.content}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
