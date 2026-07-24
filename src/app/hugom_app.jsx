@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 
 const FORBIDDEN_WORDS = [
@@ -748,6 +748,7 @@ export default function App() {
   const [showNotif,setShowNotif]=useState(false);
   const [warnMsg,setWarnMsg]=useState("");
   const [promoRankInfo,setPromoRankInfo]=useState(null); // {rank, hobon} — 진급 축하 팝업 트리거
+  const didInitTabRef = useRef(false); // 곰신 최초 진입 시 기본 탭을 "home"으로 한 번만 지정
 
   const handleTabChange = useCallback((newTab) => {
     setTab(newTab);
@@ -1001,6 +1002,25 @@ export default function App() {
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [profile?.id]);
+
+  // 곰신은 첫 진입 시 감성 홈(home) 탭으로 시작 (한 번만, 이후 이동엔 관여 안 함)
+  useEffect(() => {
+    if (profile?.id && !didInitTabRef.current) {
+      didInitTabRef.current = true;
+      if (profile.userType === "gomshin") setTab("home");
+    }
+  }, [profile?.id, profile?.userType]);
+
+  // 무료 플랜 Realtime이 끊겨도 곰신의 연결 수락이 반영되도록:
+  // "아직 연결된 상대가 없는 동안"에만 25초 간격으로 가볍게 재확인 → 연결되는 순간 멈춤(폴링 상시화 방지)
+  useEffect(() => {
+    if (!profile?.id || profile.userType !== "gomshin") return;
+    if (friends.length > 0) return;
+    const iv = setInterval(() => {
+      if (document.visibilityState === "visible") loadFriendsData();
+    }, 25000);
+    return () => clearInterval(iv);
+  }, [profile?.id, profile?.userType, friends.length]);
 
   // 진급 감지: last_seen_rank보다 실제로 계급이 올라간 경우에만 축하 팝업 표시
   useEffect(() => {
@@ -1298,6 +1318,8 @@ export default function App() {
   // 로그인 + 프로필 있음 → 메인 앱
   const isGomshin=profile.userType==="gomshin";
   const partner=friends.find(f=>f.id===viewingFriendId)||null;
+  // 곰신 홈에서 쓸 "연결된 군화" (여러 명이어도 첫 군화 우선)
+  const connectedSoldier=friends.find(f=>f.userType==="soldier")||friends[0]||null;
   // calView: "mine" | "partner" — 곰신/군화 공통으로 토글 가능 (상단 state 선언 참조)
   const showingPartner=calView==="partner"&&!!partner;
   const calLeaves=showingPartner?(partner.leaves||[]):leaves;
@@ -1308,7 +1330,7 @@ export default function App() {
   const calProfile=showingPartner?partner:profile;
   const isReadOnly=showingPartner;
   const tabs=isGomshin
-    ?[{id:"cal",icon:"📅",label:"달력"},{id:"friends",icon:"💝",label:"연결"},{id:"profile",icon:"⚙️",label:"내 정보"}]
+    ?[{id:"home",icon:"💗",label:"홈"},{id:"cal",icon:"📅",label:"달력"},{id:"friends",icon:"💝",label:"연결"},{id:"profile",icon:"⚙️",label:"내 정보"}]
     :[{id:"cal",icon:"📅",label:"달력"},{id:"leave",icon:"🏖️",label:"휴가"},{id:"friends",icon:"👥",label:"친구"},{id:"profile",icon:"⚙️",label:"내 정보"}];
 
   return (
@@ -1330,6 +1352,7 @@ export default function App() {
       {warnMsg&&<WarnModal msg={warnMsg} onClose={()=>setWarnMsg("")}/>}
       {promoRankInfo&&<PromotionCard profile={profile} rank={promoRankInfo.rank} hobon={promoRankInfo.hobon} onClose={()=>setPromoRankInfo(null)}/>}
       <div style={S.content}>
+        {tab==="home"&&isGomshin&&<GomshinHome profile={profile} partner={connectedSoldier} onPoke={poke} onGoConnect={()=>handleTabChange("friends")} onViewPartnerCal={(id)=>{setViewingFriendId(id);setCalView("partner");setTab("cal");}}/>}
         {tab==="cal"&&<CalendarTab profile={calProfile} leaves={calLeaves} schedules={calSchedules} perfDates={calOutingDates} onAddLeave={isReadOnly?null:addLeave} onDelLeave={isReadOnly?null:delLeave} onAddSched={isReadOnly?null:addSched} onDelSched={isReadOnly?null:delSched} readOnly={isReadOnly} isGomshin={isGomshin} partner={partner} calView={calView} setCalView={setCalView} onAddNotif={addNotif} myName={profile.name}/>}
         {tab==="leave"&&!isGomshin&&<LeaveTab profile={profile} leaves={leaves} perfDates={perfDates} onAddLeave={addLeave} onDelLeave={delLeave}/>}
         {tab==="friends"&&<FriendsTab profile={profile} friends={friends} setFriends={setFriends} notifs={notifs} setNotifs={setNotifs} onViewFriendCal={(id)=>{setViewingFriendId(id);setCalView("partner");setTab("cal");}} onAddNotif={addNotif} onDisconnect={disconnectPartner} onPoke={poke} onAccept={acceptConnection}/>}
@@ -1953,6 +1976,129 @@ function LeaveCard({leave,onDelete,past}){
 }
 
 // ===================== 친구 탭 (데모 로직 삭제, 실제 DB 연동만 유지) =====================
+// ===================== 곰신 홈 대시보드 (곰신 메인 화면) =====================
+function GomshinHome({profile, partner, onPoke, onGoConnect, onViewPartnerCal}){
+  const today = toKey(new Date());
+  const discharge = profile.discharge;
+  const enlist = profile.enlist;
+  const dLeft = discharge ? Math.max(0, diffDays(today, discharge)) : null;
+  const total = (enlist && discharge) ? diffDays(enlist, discharge) : null;
+  const served = (enlist && total) ? Math.min(total, Math.max(0, diffDays(enlist, today))) : null;
+  const pct = (total && served != null && total > 0) ? Math.min(100, Math.round(served / total * 100)) : null;
+
+  const leaveLabel = (t) => ({annual:"🌿 연가", reward:"🏅 포상휴가", perf:"⭐ 외박", consol:"💙 위로휴가", medical:"🏥 청원휴가"}[t] || "🌿 휴가");
+  const schedLabel = (t) => ({visit_in:"🏠 영내면회", "영내면회":"🏠 영내면회", visit_out:"🚗 면회외출", "면회외출":"🚗 면회외출"}[t] || "📌 일정");
+
+  // 다음 만남 = 연결된 군화의 다가오는 휴가/외박/면회 중 가장 가까운 것
+  const nextMeet = useMemo(() => {
+    if (!partner) return null;
+    const items = [];
+    (partner.leaves || []).forEach(l => { if (l.start_date && l.start_date >= today) items.push({date:l.start_date, end:l.end_date, label:leaveLabel(l.leave_type)}); });
+    (partner.schedules || []).forEach(s => { if (s.event_date && s.event_date >= today) items.push({date:s.event_date, end:null, label:s.title || schedLabel(s.event_type)}); });
+    items.sort((a,b) => a.date < b.date ? -1 : 1);
+    return items[0] || null;
+  }, [partner, today]);
+
+  const affirmations = [
+    "오늘도 하루가 줄었어요. 잘 기다리고 있어요 🐻",
+    "보고 싶은 마음, 곰이 대신 세어줄게요 🧸",
+    "함께할 시간이 기다림보다 길 거예요 💗",
+    "오늘 군화도 곰신 생각 하고 있을 거예요",
+    "조금씩, 그리고 분명히 가까워지고 있어요",
+    "기다림도 사랑의 한 부분이에요 💌",
+    "오늘 하루도 씩씩하게, 곰신 파이팅!",
+    "다음 만남이 어제보다 한 뼘 더 가까워졌어요",
+  ];
+  const todayLine = affirmations[Math.floor(Date.now() / 86400000) % affirmations.length];
+  const soldierName = partner?.name || profile.name;
+
+  const wrap = {display:"flex", flexDirection:"column", gap:14, padding:16};
+  return (
+    <div className="su" style={wrap}>
+      {/* 전역 D-day 히어로 */}
+      {dLeft != null ? (
+        <div style={{borderRadius:22, padding:"22px 20px", background:"linear-gradient(150deg,#7A1F4B 0%,#C2185B 45%,#E91E8C 100%)", color:"#fff", position:"relative", overflow:"hidden", boxShadow:"0 8px 24px rgba(194,24,91,.28)"}}>
+        <div style={{position:"absolute", top:-40, right:-30, width:150, height:150, borderRadius:"50%", background:"rgba(255,255,255,.08)"}}/>
+        <div style={{position:"relative"}}>
+          <div style={{fontSize:12, fontWeight:700, color:"rgba(255,255,255,.85)"}}>{soldierName}님 전역까지</div>
+          <div style={{display:"flex", alignItems:"flex-end", gap:8, marginTop:4}}>
+            <div style={{fontSize:52, fontWeight:900, lineHeight:1}}>D-{dLeft}</div>
+            <div style={{fontSize:26, marginBottom:4}}>🐻</div>
+          </div>
+          <div style={{fontSize:12, color:"rgba(255,255,255,.8)", marginTop:6}}>{fmtDate(discharge)} 전역 예정</div>
+          {pct != null && (
+            <div style={{marginTop:16}}>
+              <div style={{height:8, borderRadius:100, background:"rgba(255,255,255,.22)", overflow:"hidden"}}>
+                <div style={{height:"100%", width:`${pct}%`, borderRadius:100, background:"#fff"}}/>
+              </div>
+              <div style={{display:"flex", justifyContent:"space-between", marginTop:6, fontSize:11, color:"rgba(255,255,255,.85)", fontWeight:600}}>
+                <span>복무 {pct}% 지남</span>
+                <span>{served}일 / {total}일</span>
+              </div>
+            </div>
+          )}
+        </div>
+        </div>
+      ) : (
+        <div style={{...S.card, textAlign:"center", padding:"26px 20px"}}>
+          <div style={{fontSize:34, marginBottom:8}}>🐻</div>
+          <div style={{fontSize:15, fontWeight:800, color:"#191F28"}}>군화 전역 예정일을 알려주세요</div>
+          <div style={{fontSize:12.5, color:"#8B95A1", marginTop:6, lineHeight:1.6}}>‘내 정보’ 탭에서 입대일·전역일을 입력하면<br/>여기에 전역 D-day가 매일 떠요.</div>
+        </div>
+      )}
+
+      {/* 오늘의 한 줄 */}
+      <div style={{...S.card, display:"flex", alignItems:"center", gap:12, background:"#FFF5FA", boxShadow:"none", border:"1px solid #FBD6E8"}}>
+        <div style={{fontSize:24}}>💗</div>
+        <div style={{fontSize:13.5, fontWeight:700, color:"#C2185B", lineHeight:1.5}}>{todayLine}</div>
+      </div>
+
+      {/* 다음 만남 */}
+      {partner ? (
+        nextMeet ? (
+          <div onClick={()=>onViewPartnerCal(partner.id)} style={{...S.card, cursor:"pointer", display:"flex", alignItems:"center", gap:14}}>
+            <div style={{width:52, height:52, borderRadius:16, background:"#FFF0F8", display:"flex", alignItems:"center", justifyContent:"center", fontSize:26, flexShrink:0}}>💞</div>
+            <div style={{flex:1, minWidth:0}}>
+              <div style={{fontSize:11, fontWeight:700, color:"#E91E8C"}}>다음 만남까지</div>
+              <div style={{fontSize:20, fontWeight:900, color:"#191F28", lineHeight:1.2}}>D-{Math.max(0, diffDays(today, nextMeet.date))}</div>
+              <div style={{fontSize:12, color:"#8B95A1", marginTop:2}}>{nextMeet.label} · {fmtDate(nextMeet.date)}{nextMeet.end && nextMeet.end !== nextMeet.date ? ` ~ ${fmtDate(nextMeet.end)}` : ""}</div>
+            </div>
+            <div style={{fontSize:18, color:"#D0D8E0"}}>›</div>
+          </div>
+        ) : (
+          <div style={{...S.card, textAlign:"center", padding:"22px 18px"}}>
+            <div style={{fontSize:28, marginBottom:6}}>📭</div>
+            <div style={{fontSize:14, fontWeight:700, color:"#191F28"}}>아직 예정된 휴가·면회가 없어요</div>
+            <div style={{fontSize:12, color:"#8B95A1", marginTop:5, marginBottom:14}}>군화에게 원하는 날짜로 제안해볼까요?</div>
+            <button onClick={onGoConnect} style={{...S.btn, background:"#E91E8C", color:"#fff", boxShadow:"none"}}>💌 휴가·면회 제안하기</button>
+          </div>
+        )
+      ) : (
+        <div style={{borderRadius:20, padding:"24px 20px", background:"linear-gradient(135deg,#FF7EB3,#E91E8C)", color:"#fff", textAlign:"center", boxShadow:"0 6px 20px rgba(233,30,140,.25)"}}>
+          <div style={{fontSize:34, marginBottom:8}}>💝</div>
+          <div style={{fontSize:16, fontWeight:800}}>군화와 연결해보세요</div>
+          <div style={{fontSize:12.5, color:"rgba(255,255,255,.9)", marginTop:6, lineHeight:1.6}}>연결하면 군화의 휴가·외박·면회 일정을<br/>함께 보고, 콕 찌르기로 마음도 전할 수 있어요.</div>
+          <button onClick={onGoConnect} style={{...S.btn, background:"#fff", color:"#E91E8C", marginTop:16, boxShadow:"none"}}>군화와 연결하기</button>
+        </div>
+      )}
+
+      {/* 빠른 상호작용 (연결됐을 때만) */}
+      {partner && (
+        <div style={{display:"flex", gap:10}}>
+          <button onClick={()=>onPoke(partner.id)} style={{flex:1, padding:"14px 10px", borderRadius:16, border:"none", cursor:"pointer", background:"linear-gradient(135deg,#FF9500,#FF6B00)", color:"#fff", fontSize:13.5, fontWeight:800, display:"flex", flexDirection:"column", alignItems:"center", gap:3}}>
+            <span style={{fontSize:20}}>👉</span>
+            콕 찌르기{partner.pokeCount > 0 ? ` ${partner.pokeCount}` : ""}
+          </button>
+          <button onClick={()=>onViewPartnerCal(partner.id)} style={{flex:1, padding:"14px 10px", borderRadius:16, border:"none", cursor:"pointer", background:"#F2F4F6", color:"#4E5968", fontSize:13.5, fontWeight:800, display:"flex", flexDirection:"column", alignItems:"center", gap:3}}>
+            <span style={{fontSize:20}}>📅</span>
+            군화 달력
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FriendsTab({profile,friends,setFriends,notifs,setNotifs,onViewFriendCal,onAddNotif,onDisconnect,onPoke,onAccept}){
   const [subTab,setSubTab]=useState("list");
   const [code,setCode]=useState("");
