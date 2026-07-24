@@ -759,10 +759,12 @@ export default function App() {
   const unread=notifs.filter(n=>!n.read).length;
   const perfDates=useMemo(()=>profile?calcOutingDates(profile.perf_first_start,profile.perf_cycle_weeks,profile.perf_cycle_days):[],[profile]);
   const markAllRead=()=>{
-    setNotifs(ns=>ns.map(n=>({...n,read:true})));
-    // DB도 일괄 읽음 처리
+    // 연결요청(수락 대기)은 읽음 처리에서 제외 → 수락 전까지 계속 강조되어 놓치지 않도록
+    setNotifs(ns=>ns.map(n=> n.type==="connection_request" ? n : ({...n,read:true})));
     if(profile?.id){
-      supabase.from("notifications").update({is_read:true}).eq("user_id",profile.id).eq("is_read",false).then();
+      supabase.from("notifications").update({is_read:true})
+        .eq("user_id",profile.id).eq("is_read",false)
+        .not("message","ilike","%connection_request%").then();
     }
   };
 
